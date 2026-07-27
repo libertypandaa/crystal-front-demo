@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Crystal Front Demo</title>
+    <link rel="stylesheet" href="./src/presentation/browser/styles.css" />
+  </head>
+  <body>
+    <main class="game-shell" aria-label="Crystal Front demo">
+      <section class="zone zone-hud" aria-label="Combat information">
+        <div class="duelist duelist-player">
+          <span class="duelist-name">YOU</span>
+          <strong id="playerScore">0</strong>
+          <span id="playerRating" class="micro-chip">Rating 1200</span>
+        </div>
+        <div class="turn-core">
+          <span>TURN</span>
+          <strong id="turnNumber">1</strong>
+          <span id="turnOwner" class="micro-chip">Player move</span>
+        </div>
+        <div class="duelist duelist-rival">
+          <span class="duelist-name">RIVAL</span>
+          <strong id="aiScore">0</strong>
+          <span id="aiDifficulty" class="micro-chip">AI 62</span>
+        </div>
+      </section>
+
+      <section class="zone zone-board" aria-label="Crystal board">
+        <div class="board-wrap">
+          <div id="board" class="board" role="grid" aria-label="8 by 8 crystal front board"></div>
+        </div>
+      </section>
+
+      <section class="zone zone-bonuses" aria-label="Bonuses">
+        <button class="bonus-card" data-bonus="bomb" type="button">
+          <span class="bonus-icon">✦</span>
+          <strong>BOMB</strong>
+          <span id="bonus-bomb">3</span>
+        </button>
+        <button class="bonus-card" data-bonus="line" type="button">
+          <span class="bonus-icon">╋</span>
+          <strong>LINE</strong>
+          <span id="bonus-line">3</span>
+        </button>
+        <button class="bonus-card" data-bonus="mix" type="button">
+          <span class="bonus-icon">◌</span>
+          <strong>MIX</strong>
+          <span id="bonus-mix">2</span>
+        </button>
+        <button class="bonus-card" data-bonus="color" type="button">
+          <span class="bonus-icon">◆</span>
+          <strong>COLOR</strong>
+          <span id="bonus-color">2</span>
+        </button>
+      </section>
+
+      <section class="zone zone-system" aria-label="System controls">
+        <button id="pauseButton" class="dock-button" type="button">Ⅱ</button>
+        <button id="restartButton" class="dock-button" type="button">↻</button>
+        <button id="hintButton" class="dock-button" type="button">?</button>
+        <div class="system-card">
+          <span>RAYS</span>
+          <strong id="rays">260</strong>
+        </div>
+        <div class="system-card">
+          <span>TARGET</span>
+          <strong id="targetScore">50</strong>
+        </div>
+        <div class="system-card version">v0.1.0</div>
+      </section>
+
+      <div id="toast" class="toast" aria-live="polite"></div>
+    </main>
+
+    <script type="module" src="./src/presentation/browser/main.js"></script>
+  </body>
+</html>
