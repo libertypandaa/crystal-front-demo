@@ -47,11 +47,16 @@ export function selectBonus(state, bonus) {
 }
 
 export function runAiTurn(state) {
-  if (state.turn !== Turn.AI || state.winner) return state;
+  return runAiTurnWithTrace(state).state;
+}
+
+export function runAiTurnWithTrace(state) {
+  if (state.turn !== Turn.AI || state.winner) return { state, trace: [] };
   const swaps = findLegalSwaps(state.cells);
 
   if (swaps.length === 0) {
-    return endOrPassTurn(state, Owner.AI);
+    const nextState = endOrPassTurn(state, Owner.AI);
+    return { state: nextState, trace: [{ type: "noMoves", actor: Owner.AI, message: nextState.events.at(-1)?.message }] };
   }
 
   const rated = swaps
@@ -62,7 +67,7 @@ export function runAiTurn(state) {
   const choiceIndex = Math.min(rated.length - 1, Math.floor((1 - difficulty) * Math.random() * Math.min(8, rated.length)));
   const choice = rated[choiceIndex]?.swap ?? rated[0].swap;
 
-  return applySwapCommand(state, choice.from, choice.to, Owner.AI);
+  return submitSwapTurn(state, choice.from, choice.to, Owner.AI);
 }
 
 export function restart(state) {
@@ -86,32 +91,57 @@ export function getSnapshot(state) {
   };
 }
 
+export function submitSwapTurn(state, from, to, actor) {
+  return applySwapCommandWithTrace(state, from, to, actor);
+}
+
 function applySwapCommand(state, from, to, actor) {
+  return applySwapCommandWithTrace(state, from, to, actor).state;
+}
+
+function applySwapCommandWithTrace(state, from, to, actor) {
   const swapped = swapCrystals(state.cells, from, to);
   const matches = findMatches(swapped);
+  const trace = [{
+    type: "swap",
+    actor,
+    from,
+    to,
+    cells: cloneCells(swapped),
+    message: actor === Owner.Player ? "Player strike." : "AI strike.",
+  }];
 
   if (matches.length === 0) {
-    return {
+    const nextState = {
       ...state,
       selected: null,
       selectedBonus: null,
       events: [{ type: "MoveRejected", message: "No match. Choose a tactical swap." }],
     };
+    return {
+      state: nextState,
+      trace: [...trace, { type: "rejected", actor, from, to, cells: cloneCells(state.cells), message: nextState.events[0].message }],
+    };
   }
 
-  return resolveTurn({
+  return resolveTurnWithTrace({
     ...state,
     cells: swapped,
     selected: null,
     selectedBonus: null,
-  }, actor, [{ type: "MoveAccepted", message: actor === Owner.Player ? "Player strike." : "AI strike." }]);
+  }, actor, [{ type: "MoveAccepted", message: actor === Owner.Player ? "Player strike." : "AI strike." }], trace);
 }
 
 function resolveTurn(state, actor, incomingEvents) {
+  return resolveTurnWithTrace(state, actor, incomingEvents).state;
+}
+
+function resolveTurnWithTrace(state, actor, incomingEvents, incomingTrace = []) {
   let cells = cloneCells(state.cells);
   let totalScore = 0;
   let cascade = 0;
   const events = [...incomingEvents];
+  const trace = [...incomingTrace];
 
   while (cascade < 8) {
     const matches = findMatches(cells);
@@ -123,7 +153,23 @@ function resolveTurn(state, actor, incomingEvents) {
       message: cascade > 1 ? `Cascade x${cascade}` : `${matches.length} crystals cleared`,
       cells: matches.map((cell) => cell.id),
     });
+    trace.push({
+      type: "match",
+      actor,
+      cascade,
+      matchedIds: matches.map((cell) => cell.id),
+      cells: cloneCells(cells),
+      message: cascade > 1 ? `Cascade x${cascade}` : `${matches.length} crystals cleared`,
+    });
     cells = refillAfterClear(cells, matches, actor, state.rng);
+    trace.push({
+      type: "refill",
+      actor,
+      cascade,
+      matchedIds: matches.map((cell) => cell.id),
+      cells: cloneCells(cells),
+      message: cascade > 1 ? `Cascade refill x${cascade}` : "Front advances.",
+    });
   }
 
   const scores = { ...state.scores };
@@ -140,7 +186,19 @@ function resolveTurn(state, actor, incomingEvents) {
     events: [...events, { type: "ScoreChanged", message: `${actor === Owner.Player ? "You" : "AI"} gained ${totalScore}.` }],
   };
 
-  return checkWinner(nextState);
+  const checkedState = checkWinner(nextState);
+  return {
+    state: checkedState,
+    trace: [
+      ...trace,
+      {
+        type: "turnEnd",
+        actor,
+        cells: cloneCells(checkedState.cells),
+        message: checkedState.events.at(-1)?.message,
+      },
+    ],
+  };
 }
 
 function useBonus(state, bonus, position) {

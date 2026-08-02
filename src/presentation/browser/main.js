@@ -1,8 +1,9 @@
 import { Bonus, Owner, Turn } from "../../core/constants.js";
-import { createGame, getSnapshot, restart, runAiTurn, selectBonus, selectCell } from "../../core/game.js";
+import { createGame, getSnapshot, restart, runAiTurnWithTrace, selectBonus, selectCell, submitSwapTurn } from "../../core/game.js";
 
 let state = createGame(271828);
 let hintMode = false;
+let isAnimating = false;
 
 const els = {
   board: document.querySelector("#board"),
@@ -22,25 +23,36 @@ const els = {
 
 render();
 
-els.board.addEventListener("click", (event) => {
+els.board.addEventListener("click", async (event) => {
+  if (isAnimating) return;
   const cell = event.target.closest("[data-row]");
   if (!cell) return;
-  state = selectCell(state, {
+  const position = {
     row: Number(cell.dataset.row),
     col: Number(cell.dataset.col),
-  });
+  };
+
+  if (state.selected && isAdjacent(state.selected, position) && state.turn === Turn.Player && !state.selectedBonus) {
+    await commitAnimatedTurn(submitSwapTurn(state, state.selected, position, Owner.Player));
+    await maybeRunAi();
+    return;
+  }
+
+  state = selectCell(state, position);
   render();
-  maybeRunAi();
+  await maybeRunAi();
 });
 
 document.querySelectorAll("[data-bonus]").forEach((button) => {
   button.addEventListener("click", () => {
+    if (isAnimating) return;
     state = selectBonus(state, button.dataset.bonus);
     render();
   });
 });
 
 els.restartButton.addEventListener("click", () => {
+  if (isAnimating) return;
   state = restart(state);
   render();
 });
@@ -54,16 +66,29 @@ els.pauseButton.addEventListener("click", () => {
   showToast("Paused in spirit. This demo has no timer.");
 });
 
-function maybeRunAi() {
+async function maybeRunAi() {
   if (state.turn !== Turn.AI || state.winner) return;
-  window.setTimeout(() => {
-    state = runAiTurn(state);
-    render();
-  }, 520);
+  await wait(520);
+  await commitAnimatedTurn(runAiTurnWithTrace(state));
 }
 
-function render() {
-  const snapshot = getSnapshot(state);
+async function commitAnimatedTurn(result) {
+  isAnimating = true;
+  document.body.classList.add("is-animating");
+
+  for (const phase of result.trace) {
+    if (phase.message) showToast(phase.message);
+    if (phase.cells) render(makeSnapshot(phase.cells), phase);
+    await wait(getPhaseDuration(phase));
+  }
+
+  state = result.state;
+  isAnimating = false;
+  document.body.classList.remove("is-animating");
+  render();
+}
+
+function render(snapshot = getSnapshot(state), phase = null) {
   els.playerScore.textContent = snapshot.scores.player;
   els.aiScore.textContent = snapshot.scores.ai;
   els.turnNumber.textContent = snapshot.turnNumber;
@@ -78,7 +103,7 @@ function render() {
     const button = document.querySelector(`[data-bonus="${bonus}"]`);
     count.textContent = snapshot.bonuses[bonus];
     button.classList.toggle("is-selected", snapshot.selectedBonus === bonus);
-    button.disabled = snapshot.bonuses[bonus] <= 0 || snapshot.turn !== Turn.Player || snapshot.winner;
+    button.disabled = snapshot.bonuses[bonus] <= 0 || snapshot.turn !== Turn.Player || snapshot.winner || isAnimating;
   }
 
   els.board.innerHTML = "";
@@ -94,6 +119,7 @@ function render() {
     button.setAttribute("aria-label", `${cell.owner} ${cell.crystal} crystal at ${cell.row + 1}, ${cell.col + 1}`);
     button.classList.toggle("is-selected", snapshot.selected?.row === cell.row && snapshot.selected?.col === cell.col);
     button.classList.toggle("is-hint", legalStarts.has(`${cell.row}-${cell.col}`));
+    applyPhaseClasses(button, cell, phase);
     button.innerHTML = `<span class="crystal" aria-hidden="true"></span>`;
     els.board.append(button);
   }
@@ -155,4 +181,60 @@ function longestRun(cells, crystal) {
     longest = Math.max(longest, current);
   }
   return longest;
+}
+
+function makeSnapshot(cells) {
+  return {
+    ...getSnapshot(state),
+    cells: cells.map((cell) => ({ ...cell })),
+  };
+}
+
+function applyPhaseClasses(button, cell, phase) {
+  if (!phase) return;
+
+  const isSwapCell = phase.type === "swap" && isPosition(cell, phase.from, phase.to);
+  const isMatchedCell = phase.matchedIds?.includes(cell.id);
+  const isRejectedCell = phase.type === "rejected" && isPosition(cell, phase.from, phase.to);
+  const isAffectedCell = isSwapCell || isMatchedCell || isRejectedCell;
+
+  button.classList.toggle("is-player-action", phase.actor === Owner.Player && isAffectedCell);
+  button.classList.toggle("is-ai-action", phase.actor === Owner.AI && isAffectedCell);
+
+  if (isSwapCell) {
+    button.classList.add("is-swapping");
+  }
+
+  if (phase.type === "match" && isMatchedCell) {
+    button.classList.add("is-clearing");
+  }
+
+  if (phase.type === "refill" && isMatchedCell) {
+    button.classList.add("is-spawning");
+  }
+
+  if (isRejectedCell) {
+    button.classList.add("is-rejected");
+  }
+}
+
+function isPosition(cell, ...positions) {
+  return positions.some((position) => position && cell.row === position.row && cell.col === position.col);
+}
+
+function isAdjacent(a, b) {
+  return Math.abs(a.row - b.row) + Math.abs(a.col - b.col) === 1;
+}
+
+function wait(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function getPhaseDuration(phase) {
+  if (phase.type === "swap") return 360;
+  if (phase.type === "match") return 430;
+  if (phase.type === "refill") return 420;
+  if (phase.type === "rejected") return 300;
+  if (phase.type === "turnEnd") return 180;
+  return 240;
 }
