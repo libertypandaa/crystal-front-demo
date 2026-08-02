@@ -172,6 +172,8 @@ button {
   position: relative;
   display: grid;
   --player-control: 50%;
+  --front-blend-start: 43%;
+  --front-blend-end: 57%;
   width: 100%;
   height: 100%;
   grid-template-columns: repeat(8, 1fr);
@@ -191,9 +193,9 @@ button {
     linear-gradient(
       90deg,
       var(--player) 0%,
-      var(--player) var(--player-control),
-      #f7e9ff var(--player-control),
-      var(--opponent) calc(var(--player-control) + 1%),
+      var(--player) var(--front-blend-start),
+      rgba(248, 251, 255, 0.92) var(--player-control),
+      var(--opponent) var(--front-blend-end),
       var(--opponent) 100%
     );
   box-shadow: 0 0 14px var(--player), 0 0 18px var(--opponent);

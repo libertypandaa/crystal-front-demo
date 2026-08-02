@@ -11,8 +11,10 @@ assert.equal(snapshot.cells.filter((cell) => cell.owner === Owner.AI).length, 32
 assert.equal(snapshot.cells.filter((cell) => cell.owner === Owner.Player).length, 32);
 assert.ok(findLegalSwaps(snapshot.cells).length > 0);
 
-const move = findLegalSwaps(snapshot.cells, Owner.Player)[0];
-assert.ok(move, "player should have a legal territory move");
+const move = findLegalSwaps(snapshot.cells, Owner.AI)[0];
+assert.ok(move, "player should have a legal rival-territory move");
+assert.equal(snapshot.cells.find((cell) => cell.row === move.from.row && cell.col === move.from.col).owner, Owner.AI);
+assert.equal(snapshot.cells.find((cell) => cell.row === move.to.row && cell.col === move.to.col).owner, Owner.AI);
 state = selectCell(state, move.from);
 state = selectCell(state, move.to);
 snapshot = getSnapshot(state);

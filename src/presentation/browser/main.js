@@ -91,6 +91,8 @@ async function commitAnimatedTurn(result) {
 function render(snapshot = getSnapshot(state), phase = null) {
   const control = getControl(snapshot);
   els.board.style.setProperty("--player-control", `${control.playerPercent}%`);
+  els.board.style.setProperty("--front-blend-start", `${Math.max(0, control.playerPercent - 7)}%`);
+  els.board.style.setProperty("--front-blend-end", `${Math.min(100, control.playerPercent + 7)}%`);
   els.board.setAttribute("aria-label", `Crystal Front board. You control ${control.playerPercent} percent.`);
   els.playerScore.textContent = snapshot.scores.player;
   els.aiScore.textContent = snapshot.scores.ai;
@@ -149,13 +151,13 @@ function findHintStarts(snapshot) {
   const starts = [];
   const cells = snapshot.cells;
   const size = 8;
-  const actor = snapshot.turn === Turn.AI ? Owner.AI : Owner.Player;
+  const movableOwner = getMovableOwner(snapshot.turn);
 
   for (const cell of cells) {
     const right = cells[cell.row * size + cell.col + 1];
     const down = cells[(cell.row + 1) * size + cell.col];
-    if (right && cell.owner === actor && right.owner === actor && wouldMatch(cells, cell, right)) starts.push(cell.id, right.id);
-    if (down && cell.owner === actor && down.owner === actor && wouldMatch(cells, cell, down)) starts.push(cell.id, down.id);
+    if (right && cell.owner === movableOwner && right.owner === movableOwner && wouldMatch(cells, cell, right)) starts.push(cell.id, right.id);
+    if (down && cell.owner === movableOwner && down.owner === movableOwner && wouldMatch(cells, cell, down)) starts.push(cell.id, down.id);
   }
 
   return starts;
@@ -257,4 +259,10 @@ function getPhaseDuration(phase) {
   if (phase.type === "rejected") return 300;
   if (phase.type === "turnEnd") return 180;
   return 240;
+}
+
+function getMovableOwner(turn) {
+  if (turn === Turn.Player) return Owner.AI;
+  if (turn === Turn.AI) return Owner.Player;
+  return turn;
 }

@@ -30,8 +30,8 @@ export function selectCell(state, position) {
   if (state.turn !== Turn.Player || state.winner) return state;
   if (state.selectedBonus) return useBonus(state, state.selectedBonus, position);
   const target = getCell(state.cells, position.row, position.col);
-  if (target?.owner !== Owner.Player) {
-    return { ...state, selected: null, events: [{ type: "MoveRejected", message: "You can move only your territory crystals." }] };
+  if (target?.owner !== getMovableOwner(Owner.Player)) {
+    return { ...state, selected: null, events: [{ type: "MoveRejected", message: "Move red rival crystals to push blue forward." }] };
   }
   if (!state.selected) return { ...state, selected: position, events: [{ type: "CellSelected" }] };
 
@@ -56,7 +56,7 @@ export function runAiTurn(state) {
 
 export function runAiTurnWithTrace(state) {
   if (state.turn !== Turn.AI || state.winner) return { state, trace: [] };
-  const swaps = findLegalSwaps(state.cells, Owner.AI);
+  const swaps = findLegalSwaps(state.cells, getMovableOwner(Owner.AI));
 
   if (swaps.length === 0) {
     const nextState = endOrPassTurn(state, Owner.AI);
@@ -91,7 +91,7 @@ export function getSnapshot(state) {
     settings: { ...state.settings },
     events: state.events,
     winner: state.winner,
-    legalMoves: findLegalSwaps(state.cells, state.turn === Turn.AI ? Owner.AI : Owner.Player).length,
+    legalMoves: findLegalSwaps(state.cells, getMovableOwner(state.turn)).length,
   };
 }
 
@@ -106,12 +106,13 @@ function applySwapCommand(state, from, to, actor) {
 function applySwapCommandWithTrace(state, from, to, actor) {
   const fromCell = getCell(state.cells, from.row, from.col);
   const toCell = getCell(state.cells, to.row, to.col);
-  if (!fromCell || !toCell || !areAdjacent(fromCell, toCell) || fromCell.owner !== actor || toCell.owner !== actor) {
+  const movableOwner = getMovableOwner(actor);
+  if (!fromCell || !toCell || !areAdjacent(fromCell, toCell) || fromCell.owner !== movableOwner || toCell.owner !== movableOwner) {
     const nextState = {
       ...state,
       selected: null,
       selectedBonus: null,
-      events: [{ type: "MoveRejected", message: actor === Owner.Player ? "You can move only your territory crystals." : "AI can move only rival territory crystals." }],
+      events: [{ type: "MoveRejected", message: actor === Owner.Player ? "Move red rival crystals to push blue forward." : "AI moves blue crystals to push red forward." }],
     };
     return { state: nextState, trace: [{ type: "rejected", actor, from, to, cells: cloneCells(state.cells), message: nextState.events[0].message }] };
   }
@@ -350,4 +351,10 @@ function endOrPassTurn(state, actor) {
     turnNumber: actor === Owner.AI ? state.turnNumber + 1 : state.turnNumber,
     events: [{ type: "NoMoves", message: `${actor === Owner.AI ? "AI" : "Player"} has no scoring move.` }],
   };
+}
+
+function getMovableOwner(actor) {
+  if (actor === Owner.Player) return Owner.AI;
+  if (actor === Owner.AI) return Owner.Player;
+  return actor;
 }
