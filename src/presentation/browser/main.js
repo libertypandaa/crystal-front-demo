@@ -89,6 +89,9 @@ async function commitAnimatedTurn(result) {
 }
 
 function render(snapshot = getSnapshot(state), phase = null) {
+  const control = getControl(snapshot);
+  els.board.style.setProperty("--player-control", `${control.playerPercent}%`);
+  els.board.setAttribute("aria-label", `Crystal Front board. You control ${control.playerPercent} percent.`);
   els.playerScore.textContent = snapshot.scores.player;
   els.aiScore.textContent = snapshot.scores.ai;
   els.turnNumber.textContent = snapshot.turnNumber;
@@ -182,6 +185,16 @@ function longestRun(cells, crystal) {
     longest = Math.max(longest, current);
   }
   return longest;
+}
+
+function getControl(snapshot) {
+  const total = snapshot.cells.length || 1;
+  const playerCells = snapshot.cells.filter((cell) => cell.owner === Owner.Player).length;
+  return {
+    playerCells,
+    aiCells: snapshot.cells.filter((cell) => cell.owner === Owner.AI).length,
+    playerPercent: Math.round((playerCells / total) * 100),
+  };
 }
 
 function makeSnapshot(cells) {
