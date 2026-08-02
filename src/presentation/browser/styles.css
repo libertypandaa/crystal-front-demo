@@ -9,10 +9,10 @@
   --text-primary: #f8fbff;
   --text-secondary: #b9c6d8;
   --text-muted: #718199;
-  --player: #19aaf5;
-  --player-soft: rgba(25, 170, 245, 0.22);
-  --opponent: #f64c73;
-  --opponent-soft: rgba(246, 76, 115, 0.24);
+  --player: #f64c73;
+  --player-soft: rgba(246, 76, 115, 0.24);
+  --opponent: #19aaf5;
+  --opponent-soft: rgba(25, 170, 245, 0.22);
   --neutral: rgba(160, 175, 195, 0.16);
   --gold: #e6bd66;
   --warning: #ffcc5c;
@@ -96,14 +96,14 @@ button {
 }
 
 .duelist-player {
-  border-color: rgba(25, 170, 245, 0.48);
-  box-shadow: inset 0 0 28px rgba(25, 170, 245, 0.14);
+  border-color: rgba(246, 76, 115, 0.5);
+  box-shadow: inset 0 0 28px rgba(246, 76, 115, 0.14);
 }
 
 .duelist-rival {
   align-items: flex-end;
-  border-color: rgba(246, 76, 115, 0.5);
-  box-shadow: inset 0 0 28px rgba(246, 76, 115, 0.14);
+  border-color: rgba(25, 170, 245, 0.48);
+  box-shadow: inset 0 0 28px rgba(25, 170, 245, 0.14);
 }
 
 .duelist-name,
@@ -205,13 +205,13 @@ button {
 }
 
 .cell.owner-player {
-  background: linear-gradient(180deg, rgba(28, 185, 255, 0.22), rgba(6, 57, 93, 0.5));
-  border-color: rgba(52, 191, 255, 0.5);
+  background: linear-gradient(180deg, rgba(247, 64, 101, 0.24), rgba(81, 14, 28, 0.56));
+  border-color: rgba(255, 92, 125, 0.52);
 }
 
 .cell.owner-ai {
-  background: linear-gradient(180deg, rgba(247, 64, 101, 0.24), rgba(81, 14, 28, 0.56));
-  border-color: rgba(255, 92, 125, 0.52);
+  background: linear-gradient(180deg, rgba(28, 185, 255, 0.22), rgba(6, 57, 93, 0.5));
+  border-color: rgba(52, 191, 255, 0.5);
 }
 
 .cell.owner-neutral {
@@ -235,13 +235,13 @@ button {
 }
 
 .cell.is-player-action {
-  border-color: rgba(57, 217, 255, 0.9);
-  box-shadow: 0 0 0 1px rgba(57, 217, 255, 0.3), 0 0 18px rgba(25, 170, 245, 0.45);
+  border-color: rgba(255, 103, 136, 0.9);
+  box-shadow: 0 0 0 1px rgba(255, 103, 136, 0.3), 0 0 18px rgba(246, 76, 115, 0.45);
 }
 
 .cell.is-ai-action {
-  border-color: rgba(255, 103, 136, 0.9);
-  box-shadow: 0 0 0 1px rgba(255, 103, 136, 0.3), 0 0 18px rgba(246, 76, 115, 0.45);
+  border-color: rgba(57, 217, 255, 0.9);
+  box-shadow: 0 0 0 1px rgba(57, 217, 255, 0.3), 0 0 18px rgba(25, 170, 245, 0.45);
 }
 
 .cell.is-swapping .crystal {
@@ -258,6 +258,10 @@ button {
 
 .cell.is-rejected .crystal {
   animation: crystal-rejected 300ms ease;
+}
+
+.cell.is-captured {
+  animation: territory-captured 460ms ease;
 }
 
 .crystal {
@@ -454,6 +458,22 @@ button {
 
   75% {
     transform: translateX(12%);
+  }
+}
+
+@keyframes territory-captured {
+  0% {
+    transform: scale(0.92);
+    box-shadow: inset 0 0 0 0 rgba(255, 255, 255, 0);
+  }
+
+  45% {
+    transform: scale(1.05);
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.32), 0 0 24px currentColor;
+  }
+
+  100% {
+    transform: scale(1);
   }
 }
 

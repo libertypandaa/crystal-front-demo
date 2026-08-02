@@ -1,4 +1,4 @@
-import { Bonus, DEFAULT_SETTINGS, Owner, Turn } from "./constants.js";
+import { BOARD_SIZE, Bonus, DEFAULT_SETTINGS, Owner, Turn } from "./constants.js";
 import { areAdjacent, cloneCells, createBoard, findLegalSwaps, findMatches, getCell, refillAfterClear, swapCrystals } from "./board.js";
 import { createRng } from "./random.js";
 
@@ -29,6 +29,10 @@ export function createGame(seed = Date.now(), settings = DEFAULT_SETTINGS) {
 export function selectCell(state, position) {
   if (state.turn !== Turn.Player || state.winner) return state;
   if (state.selectedBonus) return useBonus(state, state.selectedBonus, position);
+  const target = getCell(state.cells, position.row, position.col);
+  if (target?.owner !== Owner.Player) {
+    return { ...state, selected: null, events: [{ type: "MoveRejected", message: "You can move only your territory crystals." }] };
+  }
   if (!state.selected) return { ...state, selected: position, events: [{ type: "CellSelected" }] };
 
   const from = getCell(state.cells, state.selected.row, state.selected.col);
@@ -52,7 +56,7 @@ export function runAiTurn(state) {
 
 export function runAiTurnWithTrace(state) {
   if (state.turn !== Turn.AI || state.winner) return { state, trace: [] };
-  const swaps = findLegalSwaps(state.cells);
+  const swaps = findLegalSwaps(state.cells, Owner.AI);
 
   if (swaps.length === 0) {
     const nextState = endOrPassTurn(state, Owner.AI);
@@ -87,7 +91,7 @@ export function getSnapshot(state) {
     settings: { ...state.settings },
     events: state.events,
     winner: state.winner,
-    legalMoves: findLegalSwaps(state.cells).length,
+    legalMoves: findLegalSwaps(state.cells, state.turn === Turn.AI ? Owner.AI : Owner.Player).length,
   };
 }
 
@@ -100,6 +104,18 @@ function applySwapCommand(state, from, to, actor) {
 }
 
 function applySwapCommandWithTrace(state, from, to, actor) {
+  const fromCell = getCell(state.cells, from.row, from.col);
+  const toCell = getCell(state.cells, to.row, to.col);
+  if (!fromCell || !toCell || !areAdjacent(fromCell, toCell) || fromCell.owner !== actor || toCell.owner !== actor) {
+    const nextState = {
+      ...state,
+      selected: null,
+      selectedBonus: null,
+      events: [{ type: "MoveRejected", message: actor === Owner.Player ? "You can move only your territory crystals." : "AI can move only rival territory crystals." }],
+    };
+    return { state: nextState, trace: [{ type: "rejected", actor, from, to, cells: cloneCells(state.cells), message: nextState.events[0].message }] };
+  }
+
   const swapped = swapCrystals(state.cells, from, to);
   const matches = findMatches(swapped);
   const trace = [{
@@ -170,6 +186,24 @@ function resolveTurnWithTrace(state, actor, incomingEvents, incomingTrace = []) 
       cells: cloneCells(cells),
       message: cascade > 1 ? `Cascade refill x${cascade}` : "Front advances.",
     });
+    const advance = advanceTerritory(cells, matches, actor);
+    cells = advance.cells;
+    if (advance.capturedIds.length > 0) {
+      totalScore += advance.capturedIds.length * 3;
+      events.push({
+        type: "FrontAdvanced",
+        message: `${actor === Owner.Player ? "Your" : "Rival"} front captured ${advance.capturedIds.length}.`,
+        cells: advance.capturedIds,
+      });
+      trace.push({
+        type: "advance",
+        actor,
+        cascade,
+        capturedIds: advance.capturedIds,
+        cells: cloneCells(cells),
+        message: actor === Owner.Player ? "Your territory moves forward." : "Rival territory moves forward.",
+      });
+    }
   }
 
   const scores = { ...state.scores };
@@ -254,7 +288,44 @@ function scoreMatches(matches, actor) {
 
 function previewSwapScore(state, swap, actor) {
   const swapped = swapCrystals(state.cells, swap.from, swap.to);
-  return scoreMatches(findMatches(swapped), actor);
+  const matches = findMatches(swapped);
+  return scoreMatches(matches, actor) + estimateTerritoryAdvance(state.cells, matches, actor) * 3;
+}
+
+function advanceTerritory(cells, matchedCells, actor) {
+  const next = cloneCells(cells);
+  const capturedIds = [];
+  const columns = [...new Set(matchedCells.map((cell) => cell.col))];
+
+  for (const col of columns) {
+    const row = getFrontTargetRow(next, col, actor);
+    if (row === null) continue;
+    const target = getCell(next, row, col);
+    if (target.owner === actor) continue;
+    target.owner = actor;
+    capturedIds.push(target.id);
+  }
+
+  return { cells: next, capturedIds };
+}
+
+function estimateTerritoryAdvance(cells, matchedCells, actor) {
+  const columns = [...new Set(matchedCells.map((cell) => cell.col))];
+  return columns.filter((col) => getFrontTargetRow(cells, col, actor) !== null).length;
+}
+
+function getFrontTargetRow(cells, col, actor) {
+  const ownedRows = cells.filter((cell) => cell.col === col && cell.owner === actor).map((cell) => cell.row);
+
+  if (actor === Owner.Player) {
+    if (ownedRows.length === 0) return BOARD_SIZE - 1;
+    const targetRow = Math.min(...ownedRows) - 1;
+    return targetRow >= 0 ? targetRow : null;
+  }
+
+  if (ownedRows.length === 0) return 0;
+  const targetRow = Math.max(...ownedRows) + 1;
+  return targetRow < BOARD_SIZE ? targetRow : null;
 }
 
 function checkWinner(state) {

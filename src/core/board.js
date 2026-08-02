@@ -94,10 +94,8 @@ export function refillAfterClear(cells, matchedCells, actor, rng) {
       const source = survivors.shift();
       if (source) {
         target.crystal = source.crystal;
-        target.owner = source.owner;
       } else {
         target.crystal = pick(CRYSTALS, rng);
-        target.owner = actor;
       }
     }
   }
@@ -105,7 +103,7 @@ export function refillAfterClear(cells, matchedCells, actor, rng) {
   return next;
 }
 
-export function findLegalSwaps(cells) {
+export function findLegalSwaps(cells, actor = null) {
   const swaps = [];
 
   for (let row = 0; row < BOARD_SIZE; row += 1) {
@@ -119,6 +117,7 @@ export function findLegalSwaps(cells) {
         const otherCol = col + offset[1];
         if (otherRow >= BOARD_SIZE || otherCol >= BOARD_SIZE) continue;
         const other = getCell(cells, otherRow, otherCol);
+        if (actor && (cell.owner !== actor || other.owner !== actor)) continue;
         const swapped = swapCrystals(cells, cell, other);
         if (findMatches(swapped).length > 0) {
           swaps.push({ from: { row, col }, to: { row: otherRow, col: otherCol } });

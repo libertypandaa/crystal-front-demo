@@ -146,12 +146,13 @@ function findHintStarts(snapshot) {
   const starts = [];
   const cells = snapshot.cells;
   const size = 8;
+  const actor = snapshot.turn === Turn.AI ? Owner.AI : Owner.Player;
 
   for (const cell of cells) {
     const right = cells[cell.row * size + cell.col + 1];
     const down = cells[(cell.row + 1) * size + cell.col];
-    if (right && wouldMatch(cells, cell, right)) starts.push(cell.id, right.id);
-    if (down && wouldMatch(cells, cell, down)) starts.push(cell.id, down.id);
+    if (right && cell.owner === actor && right.owner === actor && wouldMatch(cells, cell, right)) starts.push(cell.id, right.id);
+    if (down && cell.owner === actor && down.owner === actor && wouldMatch(cells, cell, down)) starts.push(cell.id, down.id);
   }
 
   return starts;
@@ -195,8 +196,9 @@ function applyPhaseClasses(button, cell, phase) {
 
   const isSwapCell = phase.type === "swap" && isPosition(cell, phase.from, phase.to);
   const isMatchedCell = phase.matchedIds?.includes(cell.id);
+  const isCapturedCell = phase.capturedIds?.includes(cell.id);
   const isRejectedCell = phase.type === "rejected" && isPosition(cell, phase.from, phase.to);
-  const isAffectedCell = isSwapCell || isMatchedCell || isRejectedCell;
+  const isAffectedCell = isSwapCell || isMatchedCell || isCapturedCell || isRejectedCell;
 
   button.classList.toggle("is-player-action", phase.actor === Owner.Player && isAffectedCell);
   button.classList.toggle("is-ai-action", phase.actor === Owner.AI && isAffectedCell);
@@ -211,6 +213,10 @@ function applyPhaseClasses(button, cell, phase) {
 
   if (phase.type === "refill" && isMatchedCell) {
     button.classList.add("is-spawning");
+  }
+
+  if (phase.type === "advance" && isCapturedCell) {
+    button.classList.add("is-captured");
   }
 
   if (isRejectedCell) {
@@ -234,6 +240,7 @@ function getPhaseDuration(phase) {
   if (phase.type === "swap") return 360;
   if (phase.type === "match") return 430;
   if (phase.type === "refill") return 420;
+  if (phase.type === "advance") return 460;
   if (phase.type === "rejected") return 300;
   if (phase.type === "turnEnd") return 180;
   return 240;
