@@ -22,6 +22,7 @@ export function createGame(seed = Date.now(), settings = DEFAULT_SETTINGS) {
     selected: null,
     selectedBonus: null,
     events: [{ type: "MatchStarted", message: "Break enemy cells. Push the front." }],
+    moveHistory: [],
     winner: null,
   };
 }
@@ -90,6 +91,14 @@ export function getSnapshot(state) {
     selectedBonus: state.selectedBonus,
     settings: { ...state.settings },
     events: state.events,
+    moveHistory: (state.moveHistory ?? []).map((move) => ({
+      ...move,
+      from: move.from ? { ...move.from } : null,
+      to: move.to ? { ...move.to } : null,
+      matched: move.matched.map((match) => ({ cascade: match.cascade, ids: [...match.ids] })),
+      capturedIds: [...move.capturedIds],
+      resultingScores: { ...move.resultingScores },
+    })),
     winner: state.winner,
     legalMoves: findLegalSwaps(state.cells, getMovableOwner(state.turn)).length,
   };
@@ -114,7 +123,10 @@ function applySwapCommandWithTrace(state, from, to, actor) {
       selectedBonus: null,
       events: [{ type: "MoveRejected", message: actor === Owner.Player ? "Move red rival crystals to push blue forward." : "AI moves blue crystals to push red forward." }],
     };
-    return { state: nextState, trace: [{ type: "rejected", actor, movableOwner, from, to, cells: cloneCells(state.cells), message: nextState.events[0].message }] };
+    return {
+      state: recordRejectedMove(nextState, actor, movableOwner, from, to, nextState.events[0].message),
+      trace: [{ type: "rejected", actor, movableOwner, from, to, cells: cloneCells(state.cells), message: nextState.events[0].message }],
+    };
   }
 
   const swapped = swapCrystals(state.cells, from, to);
@@ -137,7 +149,7 @@ function applySwapCommandWithTrace(state, from, to, actor) {
       events: [{ type: "MoveRejected", message: "No match. Choose a tactical swap." }],
     };
     return {
-      state: nextState,
+      state: recordRejectedMove(nextState, actor, movableOwner, from, to, nextState.events[0].message),
       trace: [...trace, { type: "rejected", actor, movableOwner, from, to, cells: cloneCells(state.cells), message: nextState.events[0].message }],
     };
   }
@@ -225,15 +237,16 @@ function resolveTurnWithTrace(state, actor, incomingEvents, incomingTrace = []) 
   };
 
   const checkedState = checkWinner(nextState);
+  const recordedState = recordAcceptedMove(checkedState, actor, trace, totalScore, cascade, scores);
   return {
-    state: checkedState,
+    state: recordedState,
     trace: [
       ...trace,
       {
         type: "turnEnd",
         actor,
-        cells: cloneCells(checkedState.cells),
-        message: checkedState.events.at(-1)?.message,
+        cells: cloneCells(recordedState.cells),
+        message: recordedState.events.at(-1)?.message,
       },
     ],
   };
@@ -353,6 +366,59 @@ function endOrPassTurn(state, actor) {
     turn: actor === Owner.AI ? Turn.Player : Turn.AI,
     turnNumber: actor === Owner.AI ? state.turnNumber + 1 : state.turnNumber,
     events: [{ type: "NoMoves", message: `${actor === Owner.AI ? "AI" : "Player"} has no scoring move.` }],
+  };
+}
+
+function recordAcceptedMove(state, actor, trace, scoreGain, cascades, resultingScores) {
+  const swap = trace.find((phase) => phase.type === "swap");
+  const matched = trace
+    .filter((phase) => phase.type === "match")
+    .map((phase) => ({ cascade: phase.cascade, ids: [...phase.matchedIds] }));
+  const capturedIds = trace.flatMap((phase) => phase.type === "advance" ? phase.capturedIds : []);
+
+  return {
+    ...state,
+    moveHistory: [
+      ...(state.moveHistory ?? []),
+      {
+        id: (state.moveHistory ?? []).length + 1,
+        turnNumber: state.turnNumber,
+        actor,
+        movableOwner: swap?.movableOwner ?? getMovableOwner(actor),
+        from: swap?.from ? { ...swap.from } : null,
+        to: swap?.to ? { ...swap.to } : null,
+        accepted: true,
+        scoreGain,
+        cascades,
+        matched,
+        capturedIds,
+        resultingScores: { ...resultingScores },
+      },
+    ],
+  };
+}
+
+function recordRejectedMove(state, actor, movableOwner, from, to, reason) {
+  return {
+    ...state,
+    moveHistory: [
+      ...(state.moveHistory ?? []),
+      {
+        id: (state.moveHistory ?? []).length + 1,
+        turnNumber: state.turnNumber,
+        actor,
+        movableOwner,
+        from: from ? { ...from } : null,
+        to: to ? { ...to } : null,
+        accepted: false,
+        reason,
+        scoreGain: 0,
+        cascades: 0,
+        matched: [],
+        capturedIds: [],
+        resultingScores: { ...state.scores },
+      },
+    ],
   };
 }
 

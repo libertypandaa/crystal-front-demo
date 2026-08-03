@@ -27,7 +27,7 @@ export const Bonus = Object.freeze({
 });
 
 export const DEFAULT_SETTINGS = Object.freeze({
-  targetScore: 50,
+  targetScore: 1000,
   aiDifficulty: 62,
 });
 

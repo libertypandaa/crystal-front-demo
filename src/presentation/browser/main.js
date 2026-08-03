@@ -5,6 +5,11 @@ let state = createGame(271828);
 let hintMode = false;
 let isAnimating = false;
 
+window.crystalFrontDebug = {
+  getSnapshot: () => getSnapshot(state),
+  getMoveHistory: () => getSnapshot(state).moveHistory,
+};
+
 const els = {
   board: document.querySelector("#board"),
   playerScore: document.querySelector("#playerScore"),
