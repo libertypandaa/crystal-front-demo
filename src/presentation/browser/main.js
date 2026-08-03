@@ -7,6 +7,28 @@ let appView = "main";
 let hasStartedMatch = false;
 let pendingSettings = { ...state.settings };
 let setupReturnView = "main";
+let uiPreferences = {
+  sound: true,
+  sfx: true,
+  animations: true,
+  motion: 100,
+  orientation: "auto",
+  palette: "classic",
+};
+
+const shopItems = [
+  { bonus: Bonus.Bomb, label: "Bomb", detail: "Clears a 3x3 strike zone.", cost: 35 },
+  { bonus: Bonus.Line, label: "Line", detail: "Clears one row and column.", cost: 45 },
+  { bonus: Bonus.Mix, label: "Mix", detail: "Shuffles a local 5x5 area.", cost: 30 },
+  { bonus: Bonus.Color, label: "Color", detail: "Clears one crystal color.", cost: 60 },
+];
+
+const rivals = [
+  { name: "North Prism", rating: 1380, record: "18-7" },
+  { name: "Rose Shard", rating: 1315, record: "15-8" },
+  { name: "Glass Warden", rating: 1260, record: "12-9" },
+  { name: "Mint Oracle", rating: 1120, record: "8-11" },
+];
 
 window.crystalFrontDebug = {
   getSnapshot: () => getSnapshot(state),
@@ -33,6 +55,9 @@ const els = {
   pauseButton: document.querySelector("#pauseButton"),
   mainMenu: document.querySelector("#mainMenu"),
   setupMenu: document.querySelector("#setupMenu"),
+  shopMenu: document.querySelector("#shopMenu"),
+  leaderboardMenu: document.querySelector("#leaderboardMenu"),
+  settingsMenu: document.querySelector("#settingsMenu"),
   pauseMenu: document.querySelector("#pauseMenu"),
   resultMenu: document.querySelector("#resultMenu"),
   exitMenu: document.querySelector("#exitMenu"),
@@ -48,6 +73,16 @@ const els = {
   setupAiValue: document.querySelector("#setupAiValue"),
   setupTargetScore: document.querySelector("#setupTargetScore"),
   setupTargetValue: document.querySelector("#setupTargetValue"),
+  shopList: document.querySelector("#shopList"),
+  leaderboardList: document.querySelector("#leaderboardList"),
+  ratingValue: document.querySelector("#ratingValue"),
+  ratingRays: document.querySelector("#ratingRays"),
+  ratingBest: document.querySelector("#ratingBest"),
+  settingSound: document.querySelector("#settingSound"),
+  settingSfx: document.querySelector("#settingSfx"),
+  settingAnimations: document.querySelector("#settingAnimations"),
+  settingMotion: document.querySelector("#settingMotion"),
+  settingMotionValue: document.querySelector("#settingMotionValue"),
   resultTitle: document.querySelector("#resultTitle"),
   resultPlayerScore: document.querySelector("#resultPlayerScore"),
   resultAiScore: document.querySelector("#resultAiScore"),
@@ -106,7 +141,22 @@ els.menuButton.addEventListener("click", () => {
 document.addEventListener("click", (event) => {
   const actionButton = event.target.closest("[data-action]");
   if (!actionButton || actionButton.disabled) return;
-  handleMenuAction(actionButton.dataset.action);
+  handleMenuAction(actionButton.dataset.action, actionButton);
+});
+
+document.addEventListener("pointerdown", (event) => {
+  const button = event.target.closest("button");
+  if (!button || button.disabled) return;
+  button.classList.add("is-pressed");
+});
+
+document.addEventListener("pointerup", clearPressedButtons);
+document.addEventListener("pointercancel", clearPressedButtons);
+
+document.addEventListener("pointermove", (event) => {
+  document.querySelectorAll("button.is-touch-hover").forEach((button) => button.classList.remove("is-touch-hover"));
+  const button = document.elementFromPoint(event.clientX, event.clientY)?.closest("button");
+  if (button && !button.disabled) button.classList.add("is-touch-hover");
 });
 
 els.setupAiDifficulty.addEventListener("input", () => {
@@ -124,19 +174,30 @@ els.setupTargetScore.addEventListener("input", () => {
   renderSetupValues();
 });
 
-function handleMenuAction(action) {
+els.settingSound.addEventListener("change", () => updatePreference("sound", els.settingSound.checked));
+els.settingSfx.addEventListener("change", () => updatePreference("sfx", els.settingSfx.checked));
+els.settingAnimations.addEventListener("change", () => updatePreference("animations", els.settingAnimations.checked));
+els.settingMotion.addEventListener("input", () => updatePreference("motion", Number(els.settingMotion.value)));
+
+document.querySelectorAll("[data-setting]").forEach((button) => {
+  button.addEventListener("click", () => updatePreference(button.dataset.setting, button.dataset.value));
+});
+
+function handleMenuAction(action, sourceButton) {
   if (action === "start") startNewMatch();
   if (action === "continue") continueMatch();
   if (action === "setup") openSetupMenu();
-  if (action === "shop") showComingNext("Shop");
-  if (action === "leaderboard") showComingNext("Leaderboard");
-  if (action === "settings") showComingNext("Settings");
+  if (action === "shop") openShopMenu();
+  if (action === "leaderboard") openLeaderboardMenu();
+  if (action === "settings") openSettingsMenu();
+  if (action === "buy-bonus") buyBonus(sourceButton.dataset.bonus);
   if (action === "setup-start") startNewMatch();
   if (action === "setup-back") closeSetupMenu();
   if (action === "resume") continueMatch();
   if (action === "restart") restartMatch();
   if (action === "main") openMainMenu();
   if (action === "exit-game") exitGame();
+  if (action === "settings-apply") applySettings();
 }
 
 async function maybeRunAi() {
@@ -212,6 +273,9 @@ function updateScreens(snapshot) {
   document.body.dataset.view = appView;
   els.mainMenu.hidden = appView !== "main";
   els.setupMenu.hidden = appView !== "setup";
+  els.shopMenu.hidden = appView !== "shop";
+  els.leaderboardMenu.hidden = appView !== "leaderboard";
+  els.settingsMenu.hidden = appView !== "settings";
   els.pauseMenu.hidden = appView !== "pause";
   els.resultMenu.hidden = appView !== "result";
   els.exitMenu.hidden = appView !== "exit";
@@ -219,6 +283,9 @@ function updateScreens(snapshot) {
   els.menuProfile.textContent = `Rating ${snapshot.profile.rating}`;
   els.menuRays.textContent = `${snapshot.profile.rays} Rays`;
   renderSetupValues();
+  renderShop(snapshot);
+  renderLeaderboard(snapshot);
+  renderSettings();
   updateResult(snapshot);
 }
 
@@ -276,6 +343,21 @@ function openSetupMenu() {
   render();
 }
 
+function openShopMenu() {
+  appView = "shop";
+  render();
+}
+
+function openLeaderboardMenu() {
+  appView = "leaderboard";
+  render();
+}
+
+function openSettingsMenu() {
+  appView = "settings";
+  render();
+}
+
 function closeSetupMenu() {
   appView = setupReturnView;
   render();
@@ -294,8 +376,98 @@ function renderSetupValues() {
   els.setupTargetValue.textContent = pendingSettings.targetScore;
 }
 
-function showComingNext(label) {
-  showToast(`${label} coming next.`);
+function renderShop(snapshot) {
+  els.shopList.innerHTML = "";
+  for (const item of shopItems) {
+    const row = document.createElement("div");
+    row.className = "item-row";
+    row.innerHTML = `
+      <div>
+        <strong>${item.label}</strong>
+        <span>${item.detail}</span>
+      </div>
+      <div class="item-buy">
+        <span>${snapshot.bonuses[item.bonus]}</span>
+        <button class="menu-button compact-button" data-action="buy-bonus" data-bonus="${item.bonus}" type="button">${item.cost}</button>
+      </div>
+    `;
+    row.querySelector("button").disabled = snapshot.profile.rays < item.cost;
+    els.shopList.append(row);
+  }
+}
+
+function renderLeaderboard(snapshot) {
+  els.ratingValue.textContent = snapshot.profile.rating;
+  els.ratingRays.textContent = snapshot.profile.rays;
+  els.ratingBest.textContent = `x${Math.max(0, ...snapshot.moveHistory.map((move) => move.cascades ?? 0))}`;
+
+  const rows = [
+    ...rivals,
+    { name: "You", rating: snapshot.profile.rating, record: `${snapshot.scores.player}-${snapshot.scores.ai}`, player: true },
+  ].sort((a, b) => b.rating - a.rating);
+
+  els.leaderboardList.innerHTML = "";
+  rows.forEach((row, index) => {
+    const item = document.createElement("div");
+    item.className = `rank-row${row.player ? " is-player" : ""}`;
+    item.innerHTML = `
+      <span>${index + 1}</span>
+      <strong>${row.name}</strong>
+      <em>${row.record}</em>
+      <b>${row.rating}</b>
+    `;
+    els.leaderboardList.append(item);
+  });
+}
+
+function renderSettings() {
+  els.settingSound.checked = uiPreferences.sound;
+  els.settingSfx.checked = uiPreferences.sfx;
+  els.settingAnimations.checked = uiPreferences.animations;
+  els.settingMotion.value = String(uiPreferences.motion);
+  els.settingMotionValue.textContent = `${uiPreferences.motion}%`;
+  document.querySelectorAll("[data-setting]").forEach((button) => {
+    button.classList.toggle("is-selected", uiPreferences[button.dataset.setting] === button.dataset.value);
+  });
+  document.body.classList.toggle("reduce-ui-motion", !uiPreferences.animations || uiPreferences.motion === 0);
+}
+
+function updatePreference(key, value) {
+  uiPreferences = { ...uiPreferences, [key]: value };
+  renderSettings();
+}
+
+function applySettings() {
+  showToast("Settings applied.");
+  openMainMenu();
+}
+
+function buyBonus(bonus) {
+  const item = shopItems.find((candidate) => candidate.bonus === bonus);
+  if (!item || state.profile.rays < item.cost) {
+    showToast("Not enough Rays.");
+    return;
+  }
+
+  state = {
+    ...state,
+    profile: {
+      ...state.profile,
+      rays: state.profile.rays - item.cost,
+    },
+    bonuses: {
+      ...state.bonuses,
+      [bonus]: state.bonuses[bonus] + 1,
+    },
+    events: [{ type: "ShopPurchase", message: `${item.label} purchased.` }],
+  };
+  render();
+}
+
+function clearPressedButtons() {
+  document.querySelectorAll("button.is-pressed, button.is-touch-hover").forEach((button) => {
+    button.classList.remove("is-pressed", "is-touch-hover");
+  });
 }
 
 function formatTurn(snapshot) {

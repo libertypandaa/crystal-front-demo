@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Crystal Front Demo</title>
-    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.2" />
+    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.3" />
   </head>
   <body>
     <main class="game-shell battle-shell" aria-label="Crystal Front demo">
@@ -67,7 +67,7 @@
           <span>TARGET</span>
           <strong id="targetScore">50</strong>
         </div>
-        <div class="system-card version">v0.1.2</div>
+        <div class="system-card version">v0.1.3</div>
       </section>
 
       <div id="toast" class="toast" aria-live="polite"></div>
@@ -91,7 +91,7 @@
         <footer class="menu-footer">
           <span id="menuProfile">Rating 1200</span>
           <span id="menuRays">260 Rays</span>
-          <span>v0.1.2</span>
+          <span>v0.1.3</span>
         </footer>
       </div>
     </section>
@@ -126,6 +126,90 @@
         <div class="menu-actions compact">
           <button id="setupStartButton" class="menu-button primary" data-action="setup-start" type="button">Start Duel</button>
           <button id="setupBackButton" class="menu-button" data-action="setup-back" type="button">Back</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="shopMenu" class="screen-layer modal-layer" aria-label="Shop" hidden>
+      <div class="modal-panel menu-scroll-panel">
+        <header class="modal-header">
+          <p>SHOP</p>
+          <h2>Lighthouse Rays</h2>
+        </header>
+        <div id="shopList" class="item-list"></div>
+        <div class="menu-actions compact">
+          <button class="menu-button" data-action="main" type="button">Back</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="leaderboardMenu" class="screen-layer modal-layer" aria-label="Rating" hidden>
+      <div class="modal-panel menu-scroll-panel">
+        <header class="modal-header">
+          <p>RATING</p>
+          <h2>Local Front</h2>
+        </header>
+        <div class="profile-strip">
+          <div>
+            <span>RATING</span>
+            <strong id="ratingValue">1200</strong>
+          </div>
+          <div>
+            <span>RAYS</span>
+            <strong id="ratingRays">260</strong>
+          </div>
+          <div>
+            <span>BEST</span>
+            <strong id="ratingBest">x0</strong>
+          </div>
+        </div>
+        <div id="leaderboardList" class="rank-list"></div>
+        <div class="menu-actions compact">
+          <button class="menu-button" data-action="main" type="button">Back</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="settingsMenu" class="screen-layer modal-layer" aria-label="Settings" hidden>
+      <div class="modal-panel menu-scroll-panel">
+        <header class="modal-header">
+          <p>SETTINGS</p>
+          <h2>System</h2>
+        </header>
+        <div class="control-stack">
+          <label class="toggle-row">
+            <span>Sound</span>
+            <input id="settingSound" type="checkbox" checked />
+          </label>
+          <label class="toggle-row">
+            <span>SFX</span>
+            <input id="settingSfx" type="checkbox" checked />
+          </label>
+          <label class="toggle-row">
+            <span>Animations</span>
+            <input id="settingAnimations" type="checkbox" checked />
+          </label>
+          <label class="control-row">
+            <span>
+              UI Motion
+              <strong id="settingMotionValue">100%</strong>
+            </span>
+            <input id="settingMotion" type="range" min="0" max="100" step="10" value="100" />
+          </label>
+          <div class="segmented-row" aria-label="Orientation">
+            <button class="segment is-selected" data-setting="orientation" data-value="auto" type="button">Auto</button>
+            <button class="segment" data-setting="orientation" data-value="portrait" type="button">Portrait</button>
+            <button class="segment" data-setting="orientation" data-value="landscape" type="button">Land</button>
+          </div>
+          <div class="segmented-row" aria-label="Palette">
+            <button class="segment is-selected" data-setting="palette" data-value="classic" type="button">Classic</button>
+            <button class="segment" data-setting="palette" data-value="pastel" type="button">Pastel</button>
+            <button class="segment" data-setting="palette" data-value="mint" type="button">Mint</button>
+          </div>
+        </div>
+        <div class="menu-actions compact">
+          <button class="menu-button primary" data-action="settings-apply" type="button">Apply</button>
+          <button class="menu-button" data-action="main" type="button">Back</button>
         </div>
       </div>
     </section>
@@ -189,6 +273,6 @@
       </div>
     </section>
 
-    <script type="module" src="./src/presentation/browser/main.js?v=0.1.2"></script>
+    <script type="module" src="./src/presentation/browser/main.js?v=0.1.3"></script>
   </body>
 </html>
