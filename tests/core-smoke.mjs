@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { findLegalSwaps } from "../src/core/board.js";
+import { findLegalSwaps, getBoundaryCells } from "../src/core/board.js";
 import { Owner, Turn } from "../src/core/constants.js";
 import { createGame, getSnapshot, runAiTurnWithTrace, selectCell } from "../src/core/game.js";
 
@@ -29,6 +29,13 @@ assert.equal(snapshot.moveHistory[0].actor, Owner.Player);
 assert.equal(snapshot.moveHistory[0].accepted, true);
 assert.ok(snapshot.moveHistory[0].capturedIds.length > 0);
 assert.ok(snapshot.moveHistory[0].cascades <= 4);
+
+const firstMatchIds = new Set(snapshot.moveHistory[0].matched[0].ids);
+const boundaryIds = getBoundaryCells(snapshot.moveHistory[0].matched[0].ids.map((id) => {
+  const [row, col] = id.split("-").map(Number);
+  return { row, col };
+})).map((cell) => `${cell.row}-${cell.col}`);
+assert.ok(boundaryIds.every((id) => !firstMatchIds.has(id)));
 
 const aiResult = runAiTurnWithTrace(state);
 const aiSwap = aiResult.trace.find((phase) => phase.type === "swap");

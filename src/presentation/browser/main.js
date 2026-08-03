@@ -8,6 +8,8 @@ let isAnimating = false;
 window.crystalFrontDebug = {
   getSnapshot: () => getSnapshot(state),
   getMoveHistory: () => getSnapshot(state).moveHistory,
+  getLastMoves: (count = 5) => getSnapshot(state).moveHistory.slice(-count),
+  dumpLastMoves: (count = 5) => JSON.stringify(getSnapshot(state).moveHistory.slice(-count), null, 2),
 };
 
 const els = {

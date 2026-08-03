@@ -97,10 +97,10 @@ export function findCascadeMatches(cells, previousMatches) {
 
 export function getBoundaryCells(cells) {
   const boundary = new Set();
+  const source = new Set(cells.map((cell) => cell.id ?? `${cell.row}-${cell.col}`));
 
   for (const cell of cells) {
     for (const [row, col] of [
-      [cell.row, cell.col],
       [cell.row - 1, cell.col],
       [cell.row + 1, cell.col],
       [cell.row, cell.col - 1],
@@ -110,6 +110,10 @@ export function getBoundaryCells(cells) {
         boundary.add(`${row}-${col}`);
       }
     }
+  }
+
+  for (const id of source) {
+    boundary.delete(id);
   }
 
   return [...boundary].map((id) => {
