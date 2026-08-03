@@ -1,5 +1,5 @@
-import { BOARD_SIZE, Bonus, DEFAULT_SETTINGS, Owner, Turn } from "./constants.js";
-import { areAdjacent, cloneCells, createBoard, findLegalSwaps, findMatches, getCell, refillAfterClear, swapCrystals } from "./board.js";
+import { Bonus, DEFAULT_SETTINGS, Owner, Turn } from "./constants.js";
+import { areAdjacent, cloneCells, createBoard, findCascadeMatches, findLegalSwaps, findMatchesFromCells, getCell, refillAfterClear, refillAfterClearWithCapture, swapCrystals } from "./board.js";
 import { createRng } from "./random.js";
 
 export function createGame(seed = Date.now(), settings = DEFAULT_SETTINGS) {
@@ -65,14 +65,21 @@ export function runAiTurnWithTrace(state) {
   }
 
   const rated = swaps
-    .map((swap) => ({ swap, score: previewSwapScore(state, swap, Owner.AI) }))
-    .sort((a, b) => b.score - a.score);
+    .map((swap) => ({ swap, preview: previewMoveWithCascade(state.cells, swap, Owner.AI) }))
+    .sort((a, b) => b.preview.score - a.preview.score);
 
   const difficulty = state.settings.aiDifficulty / 100;
   const choiceIndex = Math.min(rated.length - 1, Math.floor((1 - difficulty) * Math.random() * Math.min(8, rated.length)));
-  const choice = rated[choiceIndex]?.swap ?? rated[0].swap;
+  const choice = rated[choiceIndex] ?? rated[0];
 
-  return submitSwapTurn(state, choice.from, choice.to, Owner.AI);
+  return submitSwapTurn(state, choice.swap.from, choice.swap.to, Owner.AI, {
+    aiDecision: {
+      difficulty: state.settings.aiDifficulty,
+      choiceRank: choiceIndex + 1,
+      consideredMoves: rated.length,
+      preview: choice.preview,
+    },
+  });
 }
 
 export function restart(state) {
@@ -104,15 +111,15 @@ export function getSnapshot(state) {
   };
 }
 
-export function submitSwapTurn(state, from, to, actor) {
-  return applySwapCommandWithTrace(state, from, to, actor);
+export function submitSwapTurn(state, from, to, actor, options = {}) {
+  return applySwapCommandWithTrace(state, from, to, actor, options);
 }
 
 function applySwapCommand(state, from, to, actor) {
   return applySwapCommandWithTrace(state, from, to, actor).state;
 }
 
-function applySwapCommandWithTrace(state, from, to, actor) {
+function applySwapCommandWithTrace(state, from, to, actor, options = {}) {
   const fromCell = getCell(state.cells, from.row, from.col);
   const toCell = getCell(state.cells, to.row, to.col);
   const movableOwner = getMovableOwner(actor);
@@ -130,7 +137,7 @@ function applySwapCommandWithTrace(state, from, to, actor) {
   }
 
   const swapped = swapCrystals(state.cells, from, to);
-  const matches = findMatches(swapped);
+  const matches = findMatchesFromCells(swapped, [from, to]);
   const trace = [{
     type: "swap",
     actor,
@@ -159,25 +166,26 @@ function applySwapCommandWithTrace(state, from, to, actor) {
     cells: swapped,
     selected: null,
     selectedBonus: null,
-  }, actor, [{ type: "MoveAccepted", message: actor === Owner.Player ? "You move red crystals." : "AI moves blue crystals." }], trace);
+  }, actor, [{ type: "MoveAccepted", message: actor === Owner.Player ? "You move red crystals." : "AI moves blue crystals." }], trace, options);
 }
 
 function resolveTurn(state, actor, incomingEvents) {
   return resolveTurnWithTrace(state, actor, incomingEvents).state;
 }
 
-function resolveTurnWithTrace(state, actor, incomingEvents, incomingTrace = []) {
+function resolveTurnWithTrace(state, actor, incomingEvents, incomingTrace = [], options = {}) {
   let cells = cloneCells(state.cells);
   let totalScore = 0;
   let cascade = 0;
   const events = [...incomingEvents];
   const trace = [...incomingTrace];
+  let matches = findMatchesFromCells(cells, [trace[0]?.from, trace[0]?.to].filter(Boolean));
 
-  while (cascade < 8) {
-    const matches = findMatches(cells);
+  while (cascade < 4) {
     if (matches.length === 0) break;
+    if (cascade > 0 && !touchesEnemy(matches, actor)) break;
     cascade += 1;
-    totalScore += scoreMatches(matches, actor) + Math.max(0, cascade - 1) * 2;
+    totalScore += scoreMatches(matches, actor);
     events.push({
       type: "CrystalsMatched",
       message: cascade > 1 ? `Cascade x${cascade}` : `${matches.length} crystals cleared`,
@@ -192,34 +200,34 @@ function resolveTurnWithTrace(state, actor, incomingEvents, incomingTrace = []) 
       cells: cloneCells(cells),
       message: cascade > 1 ? `Cascade x${cascade}` : `${matches.length} crystals cleared`,
     });
-    cells = refillAfterClear(cells, matches, actor, state.rng);
+    const refill = refillAfterClearWithCapture(cells, matches, actor, state.rng);
+    cells = refill.cells;
     trace.push({
       type: "refill",
       actor,
       movableOwner: getMovableOwner(actor),
       cascade,
       matchedIds: matches.map((cell) => cell.id),
+      capturedIds: refill.capturedIds,
       cells: cloneCells(cells),
       message: cascade > 1 ? `Cascade refill x${cascade}` : "Front advances.",
     });
-    const advance = advanceTerritory(cells, matches, actor);
-    cells = advance.cells;
-    if (advance.capturedIds.length > 0) {
-      totalScore += advance.capturedIds.length * 3;
+    if (refill.capturedIds.length > 0) {
       events.push({
         type: "FrontAdvanced",
-        message: `${actor === Owner.Player ? "Your" : "Rival"} front captured ${advance.capturedIds.length}.`,
-        cells: advance.capturedIds,
+        message: `${actor === Owner.Player ? "Your" : "Rival"} front captured ${refill.capturedIds.length}.`,
+        cells: refill.capturedIds,
       });
       trace.push({
         type: "advance",
         actor,
         cascade,
-        capturedIds: advance.capturedIds,
+        capturedIds: refill.capturedIds,
         cells: cloneCells(cells),
         message: actor === Owner.Player ? "Your territory moves forward." : "Rival territory moves forward.",
       });
     }
+    matches = findCascadeMatches(cells, matches);
   }
 
   const scores = { ...state.scores };
@@ -237,7 +245,7 @@ function resolveTurnWithTrace(state, actor, incomingEvents, incomingTrace = []) 
   };
 
   const checkedState = checkWinner(nextState);
-  const recordedState = recordAcceptedMove(checkedState, actor, trace, totalScore, cascade, scores);
+  const recordedState = recordAcceptedMove(checkedState, actor, trace, totalScore, cascade, scores, options.aiDecision);
   return {
     state: recordedState,
     trace: [
@@ -297,52 +305,44 @@ function getBonusTargets(cells, bonus, position) {
 }
 
 function scoreMatches(matches, actor) {
+  return matches.length;
+}
+
+function previewMoveWithCascade(cells, swap, actor) {
+  let previewCells = swapCrystals(cells, swap.from, swap.to);
+  let matches = findMatchesFromCells(previewCells, [swap.from, swap.to]);
+  let cascadeCount = 0;
+  let playerDestroyed = 0;
+  let enemyDestroyed = 0;
+  let capturedCount = 0;
+  const rng = createRng((swap.from.row + 1) * 1000 + (swap.from.col + 1) * 100 + (swap.to.row + 1) * 10 + swap.to.col);
+
+  while (matches.length > 0 && cascadeCount < 4) {
+    if (cascadeCount > 0 && !touchesEnemy(matches, actor)) break;
+    cascadeCount += 1;
+    playerDestroyed += matches.filter((cell) => cell.owner === Owner.Player).length;
+    enemyDestroyed += matches.filter((cell) => cell.owner === Owner.AI).length;
+    const refill = refillAfterClearWithCapture(previewCells, matches, actor, rng);
+    previewCells = refill.cells;
+    capturedCount += refill.capturedIds.length;
+    matches = findCascadeMatches(previewCells, matches);
+  }
+
+  const targetDestroyed = actor === Owner.AI ? playerDestroyed : enemyDestroyed;
+  const ownDestroyed = actor === Owner.AI ? enemyDestroyed : playerDestroyed;
+  return {
+    createsMatch: cascadeCount > 0,
+    playerDestroyed,
+    enemyDestroyed,
+    cascadeCount,
+    capturedCount,
+    score: targetDestroyed * 3 + cascadeCount * 2 + capturedCount - ownDestroyed,
+  };
+}
+
+function touchesEnemy(matches, actor) {
   const enemy = actor === Owner.Player ? Owner.AI : Owner.Player;
-  const enemyCells = matches.filter((cell) => cell.owner === enemy).length;
-  const neutralCells = matches.filter((cell) => cell.owner === Owner.Neutral).length;
-  return enemyCells * 3 + neutralCells;
-}
-
-function previewSwapScore(state, swap, actor) {
-  const swapped = swapCrystals(state.cells, swap.from, swap.to);
-  const matches = findMatches(swapped);
-  return scoreMatches(matches, actor) + estimateTerritoryAdvance(state.cells, matches, actor) * 3;
-}
-
-function advanceTerritory(cells, matchedCells, actor) {
-  const next = cloneCells(cells);
-  const capturedIds = [];
-  const columns = [...new Set(matchedCells.map((cell) => cell.col))];
-
-  for (const col of columns) {
-    const row = getFrontTargetRow(next, col, actor);
-    if (row === null) continue;
-    const target = getCell(next, row, col);
-    if (target.owner === actor) continue;
-    target.owner = actor;
-    capturedIds.push(target.id);
-  }
-
-  return { cells: next, capturedIds };
-}
-
-function estimateTerritoryAdvance(cells, matchedCells, actor) {
-  const columns = [...new Set(matchedCells.map((cell) => cell.col))];
-  return columns.filter((col) => getFrontTargetRow(cells, col, actor) !== null).length;
-}
-
-function getFrontTargetRow(cells, col, actor) {
-  const ownedRows = cells.filter((cell) => cell.col === col && cell.owner === actor).map((cell) => cell.row);
-
-  if (actor === Owner.Player) {
-    if (ownedRows.length === 0) return BOARD_SIZE - 1;
-    const targetRow = Math.min(...ownedRows) - 1;
-    return targetRow >= 0 ? targetRow : null;
-  }
-
-  if (ownedRows.length === 0) return 0;
-  const targetRow = Math.max(...ownedRows) + 1;
-  return targetRow < BOARD_SIZE ? targetRow : null;
+  return matches.some((cell) => cell.owner === enemy);
 }
 
 function checkWinner(state) {
@@ -369,7 +369,7 @@ function endOrPassTurn(state, actor) {
   };
 }
 
-function recordAcceptedMove(state, actor, trace, scoreGain, cascades, resultingScores) {
+function recordAcceptedMove(state, actor, trace, scoreGain, cascades, resultingScores, aiDecision = null) {
   const swap = trace.find((phase) => phase.type === "swap");
   const matched = trace
     .filter((phase) => phase.type === "match")
@@ -393,6 +393,12 @@ function recordAcceptedMove(state, actor, trace, scoreGain, cascades, resultingS
         matched,
         capturedIds,
         resultingScores: { ...resultingScores },
+        aiDecision: aiDecision ? {
+          difficulty: aiDecision.difficulty,
+          choiceRank: aiDecision.choiceRank,
+          consideredMoves: aiDecision.consideredMoves,
+          preview: { ...aiDecision.preview },
+        } : null,
       },
     ],
   };

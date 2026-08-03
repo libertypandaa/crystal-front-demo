@@ -28,6 +28,7 @@ assert.equal(snapshot.moveHistory.length, 1);
 assert.equal(snapshot.moveHistory[0].actor, Owner.Player);
 assert.equal(snapshot.moveHistory[0].accepted, true);
 assert.ok(snapshot.moveHistory[0].capturedIds.length > 0);
+assert.ok(snapshot.moveHistory[0].cascades <= 4);
 
 const aiResult = runAiTurnWithTrace(state);
 const aiSwap = aiResult.trace.find((phase) => phase.type === "swap");
@@ -38,5 +39,10 @@ snapshot = getSnapshot(state);
 assert.equal(snapshot.turn, Turn.Player);
 assert.ok(snapshot.turnNumber >= 2);
 assert.ok(snapshot.moveHistory.length >= 2);
+assert.equal(snapshot.moveHistory[1].actor, Owner.AI);
+assert.equal(snapshot.moveHistory[1].aiDecision.difficulty, 62);
+assert.ok(snapshot.moveHistory[1].aiDecision.consideredMoves > 0);
+assert.equal(typeof snapshot.moveHistory[1].aiDecision.preview.cascadeCount, "number");
+assert.ok(snapshot.moveHistory[1].aiDecision.preview.cascadeCount <= 4);
 
 console.log("core smoke ok");

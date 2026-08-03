@@ -78,29 +78,64 @@ export function findMatches(cells) {
   });
 }
 
-export function refillAfterClear(cells, matchedCells, actor, rng) {
-  const next = cloneCells(cells);
-  const cleared = new Set(matchedCells.map((cell) => cell.id));
+export function findMatchesFromCells(cells, positions) {
+  const matched = new Set();
 
-  for (let col = 0; col < BOARD_SIZE; col += 1) {
-    const survivors = [];
-    for (let row = BOARD_SIZE - 1; row >= 0; row -= 1) {
-      const cell = getCell(next, row, col);
-      if (!cleared.has(cell.id)) survivors.push({ ...cell });
-    }
+  for (const position of positions) {
+    const cell = getCell(cells, position.row, position.col);
+    if (!cell) continue;
+    collectLine(getHorizontalRun(cells, cell), matched);
+    collectLine(getVerticalRun(cells, cell), matched);
+  }
 
-    for (let row = BOARD_SIZE - 1; row >= 0; row -= 1) {
-      const target = getCell(next, row, col);
-      const source = survivors.shift();
-      if (source) {
-        target.crystal = source.crystal;
-      } else {
-        target.crystal = pick(CRYSTALS, rng);
+  return idsToCells(cells, matched);
+}
+
+export function findCascadeMatches(cells, previousMatches) {
+  return findMatchesFromCells(cells, getBoundaryCells(previousMatches));
+}
+
+export function getBoundaryCells(cells) {
+  const boundary = new Set();
+
+  for (const cell of cells) {
+    for (const [row, col] of [
+      [cell.row, cell.col],
+      [cell.row - 1, cell.col],
+      [cell.row + 1, cell.col],
+      [cell.row, cell.col - 1],
+      [cell.row, cell.col + 1],
+    ]) {
+      if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE) {
+        boundary.add(`${row}-${col}`);
       }
     }
   }
 
-  return next;
+  return [...boundary].map((id) => {
+    const [row, col] = id.split("-").map(Number);
+    return { row, col };
+  });
+}
+
+export function refillAfterClear(cells, matchedCells, actor, rng) {
+  return refillAfterClearWithCapture(cells, matchedCells, actor, rng).cells;
+}
+
+export function refillAfterClearWithCapture(cells, matchedCells, actor, rng) {
+  const next = cloneCells(cells);
+  const cleared = new Set(matchedCells.map((cell) => cell.id));
+  const capturedIds = [];
+
+  for (let col = 0; col < BOARD_SIZE; col += 1) {
+    if (actor === Owner.Player) {
+      refillColumnTowardTop(cells, next, cleared, col, actor, rng, capturedIds);
+    } else {
+      refillColumnTowardBottom(cells, next, cleared, col, actor, rng, capturedIds);
+    }
+  }
+
+  return { cells: next, capturedIds };
 }
 
 export function findLegalSwaps(cells, actor = null) {
@@ -119,7 +154,7 @@ export function findLegalSwaps(cells, actor = null) {
         const other = getCell(cells, otherRow, otherCol);
         if (actor && (cell.owner !== actor || other.owner !== actor)) continue;
         const swapped = swapCrystals(cells, cell, other);
-        if (findMatches(swapped).length > 0) {
+        if (findMatchesFromCells(swapped, [{ row, col }, { row: otherRow, col: otherCol }]).length > 0) {
           swaps.push({ from: { row, col }, to: { row: otherRow, col: otherCol } });
         }
       }
@@ -132,6 +167,104 @@ export function findLegalSwaps(cells, actor = null) {
 function collectRun(run, matched) {
   if (run.length < 3) return;
   for (const cell of run) matched.add(cell.id);
+}
+
+function collectLine(run, matched) {
+  if (run.length < 3) return;
+  for (const cell of run) matched.add(cell.id);
+}
+
+function idsToCells(cells, ids) {
+  return [...ids].map((id) => {
+    const [row, col] = id.split("-").map(Number);
+    return getCell(cells, row, col);
+  });
+}
+
+function getHorizontalRun(cells, target) {
+  const run = [target];
+
+  for (let col = target.col - 1; col >= 0; col -= 1) {
+    const cell = getCell(cells, target.row, col);
+    if (cell.crystal !== target.crystal) break;
+    run.unshift(cell);
+  }
+
+  for (let col = target.col + 1; col < BOARD_SIZE; col += 1) {
+    const cell = getCell(cells, target.row, col);
+    if (cell.crystal !== target.crystal) break;
+    run.push(cell);
+  }
+
+  return run;
+}
+
+function getVerticalRun(cells, target) {
+  const run = [target];
+
+  for (let row = target.row - 1; row >= 0; row -= 1) {
+    const cell = getCell(cells, row, target.col);
+    if (cell.crystal !== target.crystal) break;
+    run.unshift(cell);
+  }
+
+  for (let row = target.row + 1; row < BOARD_SIZE; row += 1) {
+    const cell = getCell(cells, row, target.col);
+    if (cell.crystal !== target.crystal) break;
+    run.push(cell);
+  }
+
+  return run;
+}
+
+function refillColumnTowardTop(original, next, cleared, col, actor, rng, capturedIds) {
+  const survivors = [];
+  for (let row = 0; row < BOARD_SIZE; row += 1) {
+    const cell = getCell(next, row, col);
+    if (!cleared.has(cell.id)) survivors.push({ ...cell });
+  }
+
+  for (let row = 0; row < BOARD_SIZE; row += 1) {
+    const target = getCell(next, row, col);
+    const source = survivors.shift();
+    const beforeOwner = getCell(original, row, col).owner;
+    if (source) {
+      target.crystal = source.crystal;
+      target.owner = source.owner;
+    } else {
+      target.crystal = pick(CRYSTALS, rng);
+      target.owner = actor;
+    }
+    collectCapturedId(target, beforeOwner, actor, capturedIds);
+  }
+}
+
+function refillColumnTowardBottom(original, next, cleared, col, actor, rng, capturedIds) {
+  const survivors = [];
+  for (let row = BOARD_SIZE - 1; row >= 0; row -= 1) {
+    const cell = getCell(next, row, col);
+    if (!cleared.has(cell.id)) survivors.push({ ...cell });
+  }
+
+  for (let row = BOARD_SIZE - 1; row >= 0; row -= 1) {
+    const target = getCell(next, row, col);
+    const source = survivors.shift();
+    const beforeOwner = getCell(original, row, col).owner;
+    if (source) {
+      target.crystal = source.crystal;
+      target.owner = source.owner;
+    } else {
+      target.crystal = pick(CRYSTALS, rng);
+      target.owner = actor;
+    }
+    collectCapturedId(target, beforeOwner, actor, capturedIds);
+  }
+}
+
+function collectCapturedId(target, beforeOwner, actor, capturedIds) {
+  if (target.owner === actor && beforeOwner !== actor) {
+    capturedIds.push(target.id);
+  }
 }
 
 function pickNonMatchingCrystal(cells, row, col, rng) {
