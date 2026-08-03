@@ -29,13 +29,13 @@ const els = {
   targetScore: document.querySelector("#targetScore"),
   toast: document.querySelector("#toast"),
   restartButton: document.querySelector("#restartButton"),
-  exitButton: document.querySelector("#exitButton"),
   menuButton: document.querySelector("#menuButton"),
   pauseButton: document.querySelector("#pauseButton"),
   mainMenu: document.querySelector("#mainMenu"),
   setupMenu: document.querySelector("#setupMenu"),
   pauseMenu: document.querySelector("#pauseMenu"),
   resultMenu: document.querySelector("#resultMenu"),
+  exitMenu: document.querySelector("#exitMenu"),
   playButton: document.querySelector("#playButton"),
   continueButton: document.querySelector("#continueButton"),
   setupButton: document.querySelector("#setupButton"),
@@ -48,20 +48,11 @@ const els = {
   setupAiValue: document.querySelector("#setupAiValue"),
   setupTargetScore: document.querySelector("#setupTargetScore"),
   setupTargetValue: document.querySelector("#setupTargetValue"),
-  setupStartButton: document.querySelector("#setupStartButton"),
-  setupBackButton: document.querySelector("#setupBackButton"),
-  resumeButton: document.querySelector("#resumeButton"),
-  pauseRestartButton: document.querySelector("#pauseRestartButton"),
-  pauseSettingsButton: document.querySelector("#pauseSettingsButton"),
-  pauseMainButton: document.querySelector("#pauseMainButton"),
   resultTitle: document.querySelector("#resultTitle"),
   resultPlayerScore: document.querySelector("#resultPlayerScore"),
   resultAiScore: document.querySelector("#resultAiScore"),
   resultRating: document.querySelector("#resultRating"),
   resultRays: document.querySelector("#resultRays"),
-  rematchButton: document.querySelector("#rematchButton"),
-  resultSetupButton: document.querySelector("#resultSetupButton"),
-  resultMainButton: document.querySelector("#resultMainButton"),
 };
 
 render();
@@ -104,11 +95,6 @@ els.restartButton.addEventListener("click", () => {
   restartMatch();
 });
 
-els.exitButton.addEventListener("click", () => {
-  if (isAnimating) return;
-  openMainMenu();
-});
-
 els.pauseButton.addEventListener("click", () => {
   openPauseMenu();
 });
@@ -117,22 +103,12 @@ els.menuButton.addEventListener("click", () => {
   openPauseMenu();
 });
 
-els.playButton.addEventListener("click", () => {
-  startNewMatch();
+document.addEventListener("click", (event) => {
+  const actionButton = event.target.closest("[data-action]");
+  if (!actionButton || actionButton.disabled) return;
+  handleMenuAction(actionButton.dataset.action);
 });
 
-els.continueButton.addEventListener("click", () => {
-  if (!hasStartedMatch) return;
-  appView = state.winner ? "result" : "battle";
-  render();
-});
-
-els.setupButton.addEventListener("click", () => openSetupMenu("main"));
-els.shopButton.addEventListener("click", () => showComingNext("Shop"));
-els.leaderboardButton.addEventListener("click", () => showComingNext("Leaderboard"));
-els.settingsButton.addEventListener("click", () => showComingNext("Settings"));
-els.pauseSettingsButton.addEventListener("click", () => showComingNext("Settings"));
-els.resultSetupButton.addEventListener("click", () => openSetupMenu("result"));
 els.setupAiDifficulty.addEventListener("input", () => {
   pendingSettings = {
     ...pendingSettings,
@@ -147,19 +123,21 @@ els.setupTargetScore.addEventListener("input", () => {
   };
   renderSetupValues();
 });
-els.setupStartButton.addEventListener("click", () => startNewMatch());
-els.setupBackButton.addEventListener("click", () => {
-  appView = setupReturnView;
-  render();
-});
-els.resumeButton.addEventListener("click", () => {
-  appView = "battle";
-  render();
-});
-els.pauseRestartButton.addEventListener("click", () => restartMatch());
-els.pauseMainButton.addEventListener("click", () => openMainMenu());
-els.rematchButton.addEventListener("click", () => startNewMatch());
-els.resultMainButton.addEventListener("click", () => openMainMenu());
+
+function handleMenuAction(action) {
+  if (action === "start") startNewMatch();
+  if (action === "continue") continueMatch();
+  if (action === "setup") openSetupMenu();
+  if (action === "shop") showComingNext("Shop");
+  if (action === "leaderboard") showComingNext("Leaderboard");
+  if (action === "settings") showComingNext("Settings");
+  if (action === "setup-start") startNewMatch();
+  if (action === "setup-back") closeSetupMenu();
+  if (action === "resume") continueMatch();
+  if (action === "restart") restartMatch();
+  if (action === "main") openMainMenu();
+  if (action === "exit-game") exitGame();
+}
 
 async function maybeRunAi() {
   if (appView !== "battle" || state.turn !== Turn.AI || state.winner) return;
@@ -236,6 +214,7 @@ function updateScreens(snapshot) {
   els.setupMenu.hidden = appView !== "setup";
   els.pauseMenu.hidden = appView !== "pause";
   els.resultMenu.hidden = appView !== "result";
+  els.exitMenu.hidden = appView !== "exit";
   els.continueButton.disabled = !hasStartedMatch;
   els.menuProfile.textContent = `Rating ${snapshot.profile.rating}`;
   els.menuRays.textContent = `${snapshot.profile.rays} Rays`;
@@ -256,6 +235,12 @@ function updateResult(snapshot) {
   els.resultAiScore.textContent = snapshot.scores.ai;
   els.resultRating.textContent = snapshot.profile.rating;
   els.resultRays.textContent = snapshot.profile.rays;
+}
+
+function continueMatch() {
+  if (!hasStartedMatch) return;
+  appView = state.winner ? "result" : "battle";
+  render();
 }
 
 function startNewMatch() {
@@ -288,6 +273,17 @@ function openSetupMenu() {
   pendingSettings = { ...state.settings };
   setupReturnView = appView === "result" ? "result" : "main";
   appView = "setup";
+  render();
+}
+
+function closeSetupMenu() {
+  appView = setupReturnView;
+  render();
+}
+
+function exitGame() {
+  appView = "exit";
+  window.close();
   render();
 }
 

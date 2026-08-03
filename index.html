@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Crystal Front Demo</title>
-    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.1" />
+    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.2" />
   </head>
   <body>
     <main class="game-shell battle-shell" aria-label="Crystal Front demo">
@@ -58,7 +58,6 @@
       <section class="zone zone-system" aria-label="System controls">
         <button id="pauseButton" class="dock-button" type="button">II</button>
         <button id="menuButton" class="dock-button text-button" type="button">MENU</button>
-        <button id="exitButton" class="dock-button text-button" type="button">EXIT</button>
         <button id="restartButton" class="dock-button" type="button">R</button>
         <div class="system-card">
           <span>RAYS</span>
@@ -68,7 +67,7 @@
           <span>TARGET</span>
           <strong id="targetScore">50</strong>
         </div>
-        <div class="system-card version">v0.1.1</div>
+        <div class="system-card version">v0.1.2</div>
       </section>
 
       <div id="toast" class="toast" aria-live="polite"></div>
@@ -81,17 +80,18 @@
           <h1>Crystal Front</h1>
         </header>
         <div class="menu-actions">
-          <button id="playButton" class="menu-button primary" type="button">Start Duel</button>
-          <button id="continueButton" class="menu-button" type="button">Continue</button>
-          <button id="setupButton" class="menu-button" type="button">Match Setup</button>
-          <button id="shopButton" class="menu-button" type="button">Shop</button>
-          <button id="leaderboardButton" class="menu-button" type="button">Leaderboard</button>
-          <button id="settingsButton" class="menu-button" type="button">Settings</button>
+          <button id="playButton" class="menu-button primary" data-action="start" type="button">Start Duel</button>
+          <button id="continueButton" class="menu-button" data-action="continue" type="button">Continue</button>
+          <button id="setupButton" class="menu-button" data-action="setup" type="button">Match Setup</button>
+          <button id="shopButton" class="menu-button" data-action="shop" type="button">Shop</button>
+          <button id="leaderboardButton" class="menu-button" data-action="leaderboard" type="button">Leaderboard</button>
+          <button id="settingsButton" class="menu-button" data-action="settings" type="button">Settings</button>
+          <button id="exitGameButton" class="menu-button danger" data-action="exit-game" type="button">Exit Game</button>
         </div>
         <footer class="menu-footer">
           <span id="menuProfile">Rating 1200</span>
           <span id="menuRays">260 Rays</span>
-          <span>v0.1.1</span>
+          <span>v0.1.2</span>
         </footer>
       </div>
     </section>
@@ -124,8 +124,8 @@
           </div>
         </div>
         <div class="menu-actions compact">
-          <button id="setupStartButton" class="menu-button primary" type="button">Start Duel</button>
-          <button id="setupBackButton" class="menu-button" type="button">Back</button>
+          <button id="setupStartButton" class="menu-button primary" data-action="setup-start" type="button">Start Duel</button>
+          <button id="setupBackButton" class="menu-button" data-action="setup-back" type="button">Back</button>
         </div>
       </div>
     </section>
@@ -137,10 +137,10 @@
           <h2>Crystal Front</h2>
         </header>
         <div class="menu-actions compact">
-          <button id="resumeButton" class="menu-button primary" type="button">Continue</button>
-          <button id="pauseRestartButton" class="menu-button" type="button">Restart Match</button>
-          <button id="pauseSettingsButton" class="menu-button" type="button">Settings</button>
-          <button id="pauseMainButton" class="menu-button danger" type="button">Main Menu</button>
+          <button id="resumeButton" class="menu-button primary" data-action="resume" type="button">Continue</button>
+          <button id="pauseRestartButton" class="menu-button" data-action="restart" type="button">Restart Match</button>
+          <button id="pauseSettingsButton" class="menu-button" data-action="settings" type="button">Settings</button>
+          <button id="pauseMainButton" class="menu-button danger" data-action="main" type="button">Main Menu</button>
         </div>
       </div>
     </section>
@@ -170,13 +170,25 @@
           </div>
         </div>
         <div class="menu-actions compact">
-          <button id="rematchButton" class="menu-button primary" type="button">Rematch</button>
-          <button id="resultSetupButton" class="menu-button" type="button">Match Setup</button>
-          <button id="resultMainButton" class="menu-button" type="button">Main Menu</button>
+          <button id="rematchButton" class="menu-button primary" data-action="start" type="button">Rematch</button>
+          <button id="resultSetupButton" class="menu-button" data-action="setup" type="button">Match Setup</button>
+          <button id="resultMainButton" class="menu-button" data-action="main" type="button">Main Menu</button>
         </div>
       </div>
     </section>
 
-    <script type="module" src="./src/presentation/browser/main.js?v=0.1.1"></script>
+    <section id="exitMenu" class="screen-layer modal-layer" aria-label="Game closed" hidden>
+      <div class="modal-panel">
+        <header class="modal-header">
+          <p>GAME CLOSED</p>
+          <h2>Crystal Front</h2>
+        </header>
+        <div class="menu-actions compact">
+          <button id="reopenButton" class="menu-button primary" data-action="main" type="button">Open Menu</button>
+        </div>
+      </div>
+    </section>
+
+    <script type="module" src="./src/presentation/browser/main.js?v=0.1.2"></script>
   </body>
 </html>
