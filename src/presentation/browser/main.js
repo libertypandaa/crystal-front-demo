@@ -215,8 +215,9 @@ function applyPhaseClasses(button, cell, phase) {
   const isRejectedCell = phase.type === "rejected" && isPosition(cell, phase.from, phase.to);
   const isAffectedCell = isSwapCell || isMatchedCell || isCapturedCell || isRejectedCell;
 
-  button.classList.toggle("is-player-action", phase.actor === Owner.Player && isAffectedCell);
-  button.classList.toggle("is-ai-action", phase.actor === Owner.AI && isAffectedCell);
+  const actionOwner = phase.type === "advance" ? phase.actor : phase.movableOwner;
+  button.classList.toggle("is-player-action", actionOwner === Owner.Player && isAffectedCell);
+  button.classList.toggle("is-ai-action", actionOwner === Owner.AI && isAffectedCell);
 
   if (isSwapCell) {
     button.classList.add("is-swapping");
@@ -252,12 +253,12 @@ function wait(ms) {
 }
 
 function getPhaseDuration(phase) {
-  if (phase.type === "swap") return 360;
-  if (phase.type === "match") return 430;
-  if (phase.type === "refill") return 420;
-  if (phase.type === "advance") return 460;
-  if (phase.type === "rejected") return 300;
-  if (phase.type === "turnEnd") return 180;
+  if (phase.type === "swap") return 650;
+  if (phase.type === "match") return 560;
+  if (phase.type === "refill") return 500;
+  if (phase.type === "advance") return 700;
+  if (phase.type === "rejected") return 380;
+  if (phase.type === "turnEnd") return 240;
   return 240;
 }
 

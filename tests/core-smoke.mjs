@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { findLegalSwaps } from "../src/core/board.js";
 import { Owner, Turn } from "../src/core/constants.js";
-import { createGame, getSnapshot, runAiTurn, selectCell } from "../src/core/game.js";
+import { createGame, getSnapshot, runAiTurnWithTrace, selectCell } from "../src/core/game.js";
 
 let state = createGame(12345, { targetScore: 999, aiDifficulty: 62 });
 let snapshot = getSnapshot(state);
@@ -23,7 +23,10 @@ assert.equal(snapshot.turn, Turn.AI);
 assert.ok(snapshot.scores.player >= 0);
 assert.ok(snapshot.cells.filter((cell) => cell.owner === Owner.Player).length > 32);
 
-state = runAiTurn(state);
+const aiResult = runAiTurnWithTrace(state);
+const aiSwap = aiResult.trace.find((phase) => phase.type === "swap");
+if (aiSwap) assert.equal(aiSwap.movableOwner, Owner.Player);
+state = aiResult.state;
 snapshot = getSnapshot(state);
 
 assert.equal(snapshot.turn, Turn.Player);

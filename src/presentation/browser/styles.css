@@ -245,26 +245,37 @@ button {
   cursor: default;
 }
 
+.is-animating .cell {
+  opacity: 0.48;
+  transition: opacity 160ms ease, transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.is-animating .cell.is-player-action,
+.is-animating .cell.is-ai-action {
+  z-index: 4;
+  opacity: 1;
+}
+
 .cell.is-player-action {
   border-color: rgba(57, 217, 255, 0.9);
-  box-shadow: 0 0 0 1px rgba(57, 217, 255, 0.3), 0 0 18px rgba(25, 170, 245, 0.45);
+  box-shadow: 0 0 0 2px rgba(57, 217, 255, 0.42), 0 0 22px rgba(25, 170, 245, 0.62);
 }
 
 .cell.is-ai-action {
   border-color: rgba(255, 103, 136, 0.9);
-  box-shadow: 0 0 0 1px rgba(255, 103, 136, 0.3), 0 0 18px rgba(246, 76, 115, 0.45);
+  box-shadow: 0 0 0 2px rgba(255, 103, 136, 0.42), 0 0 22px rgba(246, 76, 115, 0.62);
 }
 
 .cell.is-swapping .crystal {
-  animation: crystal-swap 360ms cubic-bezier(0.2, 0.82, 0.22, 1);
+  animation: crystal-swap 650ms cubic-bezier(0.2, 0.82, 0.22, 1);
 }
 
 .cell.is-clearing .crystal {
-  animation: crystal-clear 430ms ease-in forwards;
+  animation: crystal-clear 560ms ease-in forwards;
 }
 
 .cell.is-spawning .crystal {
-  animation: crystal-spawn 420ms cubic-bezier(0.18, 0.88, 0.3, 1.2);
+  animation: crystal-spawn 500ms cubic-bezier(0.18, 0.88, 0.3, 1.2);
 }
 
 .cell.is-rejected .crystal {
@@ -272,7 +283,7 @@ button {
 }
 
 .cell.is-captured {
-  animation: territory-captured 460ms ease;
+  animation: territory-captured 700ms ease;
 }
 
 .crystal {

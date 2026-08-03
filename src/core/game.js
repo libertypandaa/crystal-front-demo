@@ -114,7 +114,7 @@ function applySwapCommandWithTrace(state, from, to, actor) {
       selectedBonus: null,
       events: [{ type: "MoveRejected", message: actor === Owner.Player ? "Move red rival crystals to push blue forward." : "AI moves blue crystals to push red forward." }],
     };
-    return { state: nextState, trace: [{ type: "rejected", actor, from, to, cells: cloneCells(state.cells), message: nextState.events[0].message }] };
+    return { state: nextState, trace: [{ type: "rejected", actor, movableOwner, from, to, cells: cloneCells(state.cells), message: nextState.events[0].message }] };
   }
 
   const swapped = swapCrystals(state.cells, from, to);
@@ -122,10 +122,11 @@ function applySwapCommandWithTrace(state, from, to, actor) {
   const trace = [{
     type: "swap",
     actor,
+    movableOwner,
     from,
     to,
     cells: cloneCells(swapped),
-    message: actor === Owner.Player ? "Player strike." : "AI strike.",
+    message: actor === Owner.Player ? "You move red crystals." : "AI moves blue crystals.",
   }];
 
   if (matches.length === 0) {
@@ -137,7 +138,7 @@ function applySwapCommandWithTrace(state, from, to, actor) {
     };
     return {
       state: nextState,
-      trace: [...trace, { type: "rejected", actor, from, to, cells: cloneCells(state.cells), message: nextState.events[0].message }],
+      trace: [...trace, { type: "rejected", actor, movableOwner, from, to, cells: cloneCells(state.cells), message: nextState.events[0].message }],
     };
   }
 
@@ -146,7 +147,7 @@ function applySwapCommandWithTrace(state, from, to, actor) {
     cells: swapped,
     selected: null,
     selectedBonus: null,
-  }, actor, [{ type: "MoveAccepted", message: actor === Owner.Player ? "Player strike." : "AI strike." }], trace);
+  }, actor, [{ type: "MoveAccepted", message: actor === Owner.Player ? "You move red crystals." : "AI moves blue crystals." }], trace);
 }
 
 function resolveTurn(state, actor, incomingEvents) {
@@ -173,6 +174,7 @@ function resolveTurnWithTrace(state, actor, incomingEvents, incomingTrace = []) 
     trace.push({
       type: "match",
       actor,
+      movableOwner: getMovableOwner(actor),
       cascade,
       matchedIds: matches.map((cell) => cell.id),
       cells: cloneCells(cells),
@@ -182,6 +184,7 @@ function resolveTurnWithTrace(state, actor, incomingEvents, incomingTrace = []) 
     trace.push({
       type: "refill",
       actor,
+      movableOwner: getMovableOwner(actor),
       cascade,
       matchedIds: matches.map((cell) => cell.id),
       cells: cloneCells(cells),
