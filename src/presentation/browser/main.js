@@ -10,6 +10,7 @@ window.crystalFrontDebug = {
   getMoveHistory: () => getSnapshot(state).moveHistory,
   getLastMoves: (count = 5) => getSnapshot(state).moveHistory.slice(-count),
   dumpLastMoves: (count = 5) => JSON.stringify(getSnapshot(state).moveHistory.slice(-count), null, 2),
+  copyLastMoves: (count = 10) => copyLastMoves(count),
 };
 
 const els = {
@@ -64,7 +65,30 @@ els.restartButton.addEventListener("click", () => {
   render();
 });
 
-els.hintButton.addEventListener("click", () => {
+let hintLongPressTimer = null;
+let hintLongPressHandled = false;
+
+els.hintButton.addEventListener("pointerdown", () => {
+  hintLongPressHandled = false;
+  hintLongPressTimer = window.setTimeout(async () => {
+    hintLongPressHandled = true;
+    await copyLastMoves(10);
+  }, 650);
+});
+
+els.hintButton.addEventListener("pointerup", () => {
+  window.clearTimeout(hintLongPressTimer);
+});
+
+els.hintButton.addEventListener("pointerleave", () => {
+  window.clearTimeout(hintLongPressTimer);
+});
+
+els.hintButton.addEventListener("click", (event) => {
+  if (hintLongPressHandled) {
+    event.preventDefault();
+    return;
+  }
   hintMode = !hintMode;
   render();
 });
@@ -90,6 +114,7 @@ async function commitAnimatedTurn(result) {
   }
 
   state = result.state;
+  persistLastMoves();
   isAnimating = false;
   document.body.classList.remove("is-animating");
   render();
@@ -152,6 +177,25 @@ function showToast(message) {
   els.toast.classList.add("is-visible");
   window.clearTimeout(showToast.timer);
   showToast.timer = window.setTimeout(() => els.toast.classList.remove("is-visible"), 1800);
+}
+
+async function copyLastMoves(count = 10) {
+  const payload = window.crystalFrontDebug.dumpLastMoves(count);
+  persistLastMoves();
+
+  try {
+    await navigator.clipboard.writeText(payload);
+    showToast(`Copied last ${Math.min(count, getSnapshot(state).moveHistory.length)} moves.`);
+    return payload;
+  } catch {
+    window.localStorage.setItem("crystalFrontLastMoves", payload);
+    showToast("Saved last moves locally.");
+    return payload;
+  }
+}
+
+function persistLastMoves() {
+  window.localStorage.setItem("crystalFrontLastMoves", window.crystalFrontDebug.dumpLastMoves(10));
 }
 
 function findHintStarts(snapshot) {
