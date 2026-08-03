@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="./src/presentation/browser/styles.css" />
   </head>
   <body>
-    <main class="game-shell" aria-label="Crystal Front demo">
+    <main class="game-shell battle-shell" aria-label="Crystal Front demo">
       <section class="zone zone-hud" aria-label="Combat information">
         <div class="duelist duelist-player">
           <span class="duelist-name">YOU</span>
@@ -34,31 +34,31 @@
 
       <section class="zone zone-bonuses" aria-label="Bonuses">
         <button class="bonus-card" data-bonus="bomb" type="button">
-          <span class="bonus-icon">✦</span>
+          <span class="bonus-icon">B</span>
           <strong>BOMB</strong>
           <span id="bonus-bomb">3</span>
         </button>
         <button class="bonus-card" data-bonus="line" type="button">
-          <span class="bonus-icon">╋</span>
+          <span class="bonus-icon">+</span>
           <strong>LINE</strong>
           <span id="bonus-line">3</span>
         </button>
         <button class="bonus-card" data-bonus="mix" type="button">
-          <span class="bonus-icon">◌</span>
+          <span class="bonus-icon">M</span>
           <strong>MIX</strong>
           <span id="bonus-mix">2</span>
         </button>
         <button class="bonus-card" data-bonus="color" type="button">
-          <span class="bonus-icon">◆</span>
+          <span class="bonus-icon">C</span>
           <strong>COLOR</strong>
           <span id="bonus-color">2</span>
         </button>
       </section>
 
       <section class="zone zone-system" aria-label="System controls">
-        <button id="pauseButton" class="dock-button" type="button">Ⅱ</button>
-        <button id="restartButton" class="dock-button" type="button">↻</button>
-        <button id="hintButton" class="dock-button" type="button">?</button>
+        <button id="pauseButton" class="dock-button" type="button">II</button>
+        <button id="menuButton" class="dock-button text-button" type="button">MENU</button>
+        <button id="restartButton" class="dock-button" type="button">R</button>
         <div class="system-card">
           <span>RAYS</span>
           <strong id="rays">260</strong>
@@ -72,6 +72,75 @@
 
       <div id="toast" class="toast" aria-live="polite"></div>
     </main>
+
+    <section id="mainMenu" class="screen-layer screen-main" aria-label="Main menu">
+      <div class="menu-panel">
+        <header class="menu-header">
+          <p>TACTICAL CRYSTAL DUEL</p>
+          <h1>Crystal Front</h1>
+        </header>
+        <div class="menu-actions">
+          <button id="playButton" class="menu-button primary" type="button">Start Duel</button>
+          <button id="continueButton" class="menu-button" type="button">Continue</button>
+          <button id="setupButton" class="menu-button" type="button">Match Setup</button>
+          <button id="shopButton" class="menu-button" type="button">Shop</button>
+          <button id="leaderboardButton" class="menu-button" type="button">Leaderboard</button>
+          <button id="settingsButton" class="menu-button" type="button">Settings</button>
+        </div>
+        <footer class="menu-footer">
+          <span id="menuProfile">Rating 1200</span>
+          <span id="menuRays">260 Rays</span>
+          <span>v0.1.0</span>
+        </footer>
+      </div>
+    </section>
+
+    <section id="pauseMenu" class="screen-layer modal-layer" aria-label="Pause menu" hidden>
+      <div class="modal-panel">
+        <header class="modal-header">
+          <p>PAUSED</p>
+          <h2>Crystal Front</h2>
+        </header>
+        <div class="menu-actions compact">
+          <button id="resumeButton" class="menu-button primary" type="button">Continue</button>
+          <button id="pauseRestartButton" class="menu-button" type="button">Restart Match</button>
+          <button id="pauseSettingsButton" class="menu-button" type="button">Settings</button>
+          <button id="pauseMainButton" class="menu-button danger" type="button">Main Menu</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="resultMenu" class="screen-layer modal-layer" aria-label="Match result" hidden>
+      <div class="modal-panel result-panel">
+        <header class="modal-header">
+          <p id="resultEyebrow">MATCH ENDED</p>
+          <h2 id="resultTitle">Victory</h2>
+        </header>
+        <div class="result-grid">
+          <div>
+            <span>YOU</span>
+            <strong id="resultPlayerScore">0</strong>
+          </div>
+          <div>
+            <span>RIVAL</span>
+            <strong id="resultAiScore">0</strong>
+          </div>
+          <div>
+            <span>RATING</span>
+            <strong id="resultRating">1200</strong>
+          </div>
+          <div>
+            <span>RAYS</span>
+            <strong id="resultRays">260</strong>
+          </div>
+        </div>
+        <div class="menu-actions compact">
+          <button id="rematchButton" class="menu-button primary" type="button">Rematch</button>
+          <button id="resultSetupButton" class="menu-button" type="button">Match Setup</button>
+          <button id="resultMainButton" class="menu-button" type="button">Main Menu</button>
+        </div>
+      </div>
+    </section>
 
     <script type="module" src="./src/presentation/browser/main.js"></script>
   </body>

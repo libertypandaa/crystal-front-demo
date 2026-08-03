@@ -2,11 +2,13 @@ import { Bonus, Owner, Turn } from "../../core/constants.js";
 import { createGame, getSnapshot, restart, runAiTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
 
 let state = createGame(271828);
-let hintMode = false;
 let isAnimating = false;
+let appView = "main";
+let hasStartedMatch = false;
 
 window.crystalFrontDebug = {
   getSnapshot: () => getSnapshot(state),
+  getView: () => appView,
   getMoveHistory: () => getSnapshot(state).moveHistory,
   getLastMoves: (count = 5) => getSnapshot(state).moveHistory.slice(-count),
   dumpLastMoves: (count = 5) => JSON.stringify(getSnapshot(state).moveHistory.slice(-count), null, 2),
@@ -25,14 +27,37 @@ const els = {
   targetScore: document.querySelector("#targetScore"),
   toast: document.querySelector("#toast"),
   restartButton: document.querySelector("#restartButton"),
-  hintButton: document.querySelector("#hintButton"),
+  menuButton: document.querySelector("#menuButton"),
   pauseButton: document.querySelector("#pauseButton"),
+  mainMenu: document.querySelector("#mainMenu"),
+  pauseMenu: document.querySelector("#pauseMenu"),
+  resultMenu: document.querySelector("#resultMenu"),
+  playButton: document.querySelector("#playButton"),
+  continueButton: document.querySelector("#continueButton"),
+  setupButton: document.querySelector("#setupButton"),
+  shopButton: document.querySelector("#shopButton"),
+  leaderboardButton: document.querySelector("#leaderboardButton"),
+  settingsButton: document.querySelector("#settingsButton"),
+  menuProfile: document.querySelector("#menuProfile"),
+  menuRays: document.querySelector("#menuRays"),
+  resumeButton: document.querySelector("#resumeButton"),
+  pauseRestartButton: document.querySelector("#pauseRestartButton"),
+  pauseSettingsButton: document.querySelector("#pauseSettingsButton"),
+  pauseMainButton: document.querySelector("#pauseMainButton"),
+  resultTitle: document.querySelector("#resultTitle"),
+  resultPlayerScore: document.querySelector("#resultPlayerScore"),
+  resultAiScore: document.querySelector("#resultAiScore"),
+  resultRating: document.querySelector("#resultRating"),
+  resultRays: document.querySelector("#resultRays"),
+  rematchButton: document.querySelector("#rematchButton"),
+  resultSetupButton: document.querySelector("#resultSetupButton"),
+  resultMainButton: document.querySelector("#resultMainButton"),
 };
 
 render();
 
 els.board.addEventListener("click", async (event) => {
-  if (isAnimating) return;
+  if (isAnimating || appView !== "battle") return;
   const cell = event.target.closest("[data-row]");
   if (!cell) return;
   const position = {
@@ -59,53 +84,53 @@ els.board.addEventListener("click", async (event) => {
 
 document.querySelectorAll("[data-bonus]").forEach((button) => {
   button.addEventListener("click", () => {
-    if (isAnimating) return;
+    if (isAnimating || appView !== "battle") return;
     state = selectBonus(state, button.dataset.bonus);
     render();
   });
 });
 
 els.restartButton.addEventListener("click", () => {
-  if (isAnimating) return;
-  state = restart(state);
-  render();
-});
-
-let hintLongPressTimer = null;
-let hintLongPressHandled = false;
-
-els.hintButton.addEventListener("pointerdown", () => {
-  hintLongPressHandled = false;
-  hintLongPressTimer = window.setTimeout(async () => {
-    hintLongPressHandled = true;
-    await copyLastMoves(10);
-  }, 650);
-});
-
-els.hintButton.addEventListener("pointerup", () => {
-  window.clearTimeout(hintLongPressTimer);
-});
-
-els.hintButton.addEventListener("pointerleave", () => {
-  window.clearTimeout(hintLongPressTimer);
-});
-
-els.hintButton.addEventListener("click", (event) => {
-  if (hintLongPressHandled) {
-    event.preventDefault();
-    return;
-  }
-  hintMode = !hintMode;
-  render();
+  restartMatch();
 });
 
 els.pauseButton.addEventListener("click", () => {
-  showToast("Paused in spirit. This demo has no timer.");
+  openPauseMenu();
 });
 
+els.menuButton.addEventListener("click", () => {
+  openPauseMenu();
+});
+
+els.playButton.addEventListener("click", () => {
+  startNewMatch();
+});
+
+els.continueButton.addEventListener("click", () => {
+  if (!hasStartedMatch) return;
+  appView = state.winner ? "result" : "battle";
+  render();
+});
+
+els.setupButton.addEventListener("click", () => showComingNext("Match Setup"));
+els.shopButton.addEventListener("click", () => showComingNext("Shop"));
+els.leaderboardButton.addEventListener("click", () => showComingNext("Leaderboard"));
+els.settingsButton.addEventListener("click", () => showComingNext("Settings"));
+els.pauseSettingsButton.addEventListener("click", () => showComingNext("Settings"));
+els.resultSetupButton.addEventListener("click", () => showComingNext("Match Setup"));
+els.resumeButton.addEventListener("click", () => {
+  appView = "battle";
+  render();
+});
+els.pauseRestartButton.addEventListener("click", () => restartMatch());
+els.pauseMainButton.addEventListener("click", () => openMainMenu());
+els.rematchButton.addEventListener("click", () => startNewMatch());
+els.resultMainButton.addEventListener("click", () => openMainMenu());
+
 async function maybeRunAi() {
-  if (state.turn !== Turn.AI || state.winner) return;
+  if (appView !== "battle" || state.turn !== Turn.AI || state.winner) return;
   await wait(520);
+  if (appView !== "battle") return;
   await commitAnimatedTurn(runAiTurnWithTrace(state));
 }
 
@@ -123,10 +148,12 @@ async function commitAnimatedTurn(result) {
   persistLastMoves();
   isAnimating = false;
   document.body.classList.remove("is-animating");
+  if (state.winner) appView = "result";
   render();
 }
 
 function render(snapshot = getSnapshot(state), phase = null) {
+  updateScreens(snapshot);
   const control = getControl(snapshot);
   els.board.style.setProperty("--player-control", `${control.playerPercent}%`);
   els.board.style.setProperty("--front-blend-start", `${Math.max(0, control.playerPercent - 7)}%`);
@@ -146,11 +173,10 @@ function render(snapshot = getSnapshot(state), phase = null) {
     const button = document.querySelector(`[data-bonus="${bonus}"]`);
     count.textContent = snapshot.bonuses[bonus];
     button.classList.toggle("is-selected", snapshot.selectedBonus === bonus);
-    button.disabled = snapshot.bonuses[bonus] <= 0 || snapshot.turn !== Turn.Player || snapshot.winner || isAnimating;
+    button.disabled = snapshot.bonuses[bonus] <= 0 || snapshot.turn !== Turn.Player || snapshot.winner || isAnimating || appView !== "battle";
   }
 
   els.board.innerHTML = "";
-  const legalStarts = hintMode ? new Set(snapshot.legalMoves ? findHintStarts(snapshot) : []) : new Set();
 
   for (const cell of snapshot.cells) {
     const button = document.createElement("button");
@@ -161,7 +187,6 @@ function render(snapshot = getSnapshot(state), phase = null) {
     button.setAttribute("role", "gridcell");
     button.setAttribute("aria-label", `${cell.owner} ${cell.crystal} crystal at ${cell.row + 1}, ${cell.col + 1}`);
     button.classList.toggle("is-selected", snapshot.selected?.row === cell.row && snapshot.selected?.col === cell.col);
-    button.classList.toggle("is-hint", legalStarts.has(`${cell.row}-${cell.col}`));
     applyPhaseClasses(button, cell, phase);
     button.innerHTML = `<span class="crystal" aria-hidden="true"></span>`;
     els.board.append(button);
@@ -169,6 +194,62 @@ function render(snapshot = getSnapshot(state), phase = null) {
 
   const message = snapshot.events.at(-1)?.message;
   if (message) showToast(message);
+}
+
+function updateScreens(snapshot) {
+  document.body.dataset.view = appView;
+  els.mainMenu.hidden = appView !== "main";
+  els.pauseMenu.hidden = appView !== "pause";
+  els.resultMenu.hidden = appView !== "result";
+  els.continueButton.disabled = !hasStartedMatch;
+  els.menuProfile.textContent = `Rating ${snapshot.profile.rating}`;
+  els.menuRays.textContent = `${snapshot.profile.rays} Rays`;
+  updateResult(snapshot);
+}
+
+function updateResult(snapshot) {
+  const title = snapshot.winner === Owner.Player
+    ? "Victory"
+    : snapshot.winner === Owner.AI
+      ? "Defeat"
+      : snapshot.winner === "draw"
+        ? "Draw"
+        : "Match";
+  els.resultTitle.textContent = title;
+  els.resultPlayerScore.textContent = snapshot.scores.player;
+  els.resultAiScore.textContent = snapshot.scores.ai;
+  els.resultRating.textContent = snapshot.profile.rating;
+  els.resultRays.textContent = snapshot.profile.rays;
+}
+
+function startNewMatch() {
+  state = restart(state);
+  hasStartedMatch = true;
+  appView = "battle";
+  render();
+}
+
+function restartMatch() {
+  if (isAnimating) return;
+  state = restart(state);
+  hasStartedMatch = true;
+  appView = "battle";
+  render();
+}
+
+function openPauseMenu() {
+  if (isAnimating || appView !== "battle" || state.winner) return;
+  appView = "pause";
+  render();
+}
+
+function openMainMenu() {
+  appView = "main";
+  render();
+}
+
+function showComingNext(label) {
+  showToast(`${label} coming next.`);
 }
 
 function formatTurn(snapshot) {
@@ -202,48 +283,6 @@ async function copyLastMoves(count = 10) {
 
 function persistLastMoves() {
   window.localStorage.setItem("crystalFrontLastMoves", window.crystalFrontDebug.dumpLastMoves(10));
-}
-
-function findHintStarts(snapshot) {
-  const starts = [];
-  const cells = snapshot.cells;
-  const size = 8;
-  const movableOwner = getMovableOwner(snapshot.turn);
-
-  for (const cell of cells) {
-    const right = cells[cell.row * size + cell.col + 1];
-    const down = cells[(cell.row + 1) * size + cell.col];
-    if (right && cell.owner === movableOwner && right.owner === movableOwner && wouldMatch(cells, cell, right)) starts.push(cell.id, right.id);
-    if (down && cell.owner === movableOwner && down.owner === movableOwner && wouldMatch(cells, cell, down)) starts.push(cell.id, down.id);
-  }
-
-  return starts;
-}
-
-function wouldMatch(cells, a, b) {
-  const copy = cells.map((cell) => ({ ...cell }));
-  const first = copy.find((cell) => cell.id === a.id);
-  const second = copy.find((cell) => cell.id === b.id);
-  const crystal = first.crystal;
-  first.crystal = second.crystal;
-  second.crystal = crystal;
-  return hasMatchAt(copy, first) || hasMatchAt(copy, second);
-}
-
-function hasMatchAt(cells, target) {
-  const sameRow = cells.filter((cell) => cell.row === target.row).sort((a, b) => a.col - b.col);
-  const sameCol = cells.filter((cell) => cell.col === target.col).sort((a, b) => a.row - b.row);
-  return longestRun(sameRow, target.crystal) >= 3 || longestRun(sameCol, target.crystal) >= 3;
-}
-
-function longestRun(cells, crystal) {
-  let longest = 0;
-  let current = 0;
-  for (const cell of cells) {
-    current = cell.crystal === crystal ? current + 1 : 0;
-    longest = Math.max(longest, current);
-  }
-  return longest;
 }
 
 function getControl(snapshot) {
@@ -329,10 +368,4 @@ function getPhaseDuration(phase) {
   if (phase.type === "rejected") return 380;
   if (phase.type === "turnEnd") return 240;
   return 240;
-}
-
-function getMovableOwner(turn) {
-  if (turn === Turn.Player) return Owner.AI;
-  if (turn === Turn.AI) return Owner.Player;
-  return turn;
 }
