@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { findLegalSwaps, getBoundaryCells } from "../src/core/board.js";
-import { Owner, Turn } from "../src/core/constants.js";
-import { createGame, getSnapshot, runAiTurnWithTrace, selectCell } from "../src/core/game.js";
+import { Bonus, Owner, Turn } from "../src/core/constants.js";
+import { createGame, getSnapshot, runAiTurnWithTrace, selectBonus, selectCell } from "../src/core/game.js";
 
 let state = createGame(12345, { aiDifficulty: 62 });
 let snapshot = getSnapshot(state);
@@ -48,8 +48,20 @@ assert.ok(snapshot.turnNumber >= 2);
 assert.ok(snapshot.moveHistory.length >= 2);
 assert.equal(snapshot.moveHistory[1].actor, Owner.AI);
 assert.equal(snapshot.moveHistory[1].aiDecision.difficulty, 62);
+assert.ok(snapshot.moveHistory[1].aiDecision.bias > 0);
 assert.ok(snapshot.moveHistory[1].aiDecision.consideredMoves > 0);
+assert.equal(snapshot.moveHistory[1].aiDecision.weights.length, snapshot.moveHistory[1].aiDecision.consideredMoves);
 assert.equal(typeof snapshot.moveHistory[1].aiDecision.preview.cascadeCount, "number");
 assert.ok(snapshot.moveHistory[1].aiDecision.preview.cascadeCount <= 4);
+
+let mixState = createGame(24680, { aiDifficulty: 62 });
+mixState = selectBonus(mixState, Bonus.Mix);
+mixState = selectCell(mixState, { row: 4, col: 4 });
+const mixSnapshot = getSnapshot(mixState);
+assert.equal(mixSnapshot.bonuses[Bonus.Mix], 1);
+assert.equal(mixSnapshot.moveHistory.length, 1);
+assert.equal(mixSnapshot.moveHistory[0].actor, Owner.Player);
+assert.equal(mixSnapshot.moveHistory[0].bonus.type, Bonus.Mix);
+assert.equal(mixSnapshot.moveHistory[0].bonus.changedIds.length, 25);
 
 console.log("core smoke ok");

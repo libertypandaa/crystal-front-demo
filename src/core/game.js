@@ -1,6 +1,6 @@
-import { Bonus, DEFAULT_SETTINGS, Owner, Turn } from "./constants.js";
-import { areAdjacent, cloneCells, createBoard, findCascadeMatches, findLegalSwaps, findMatchesFromCells, getCell, refillAfterClear, refillAfterClearWithCapture, swapCrystals } from "./board.js";
-import { createRng } from "./random.js";
+import { Bonus, CRYSTALS, DEFAULT_SETTINGS, Owner, Turn } from "./constants.js";
+import { areAdjacent, cloneCells, createBoard, findCascadeMatches, findLegalSwaps, findMatchesFromCells, getCell, refillAfterClearWithCapture, swapCrystals } from "./board.js";
+import { createRng, pick } from "./random.js";
 
 export function createGame(seed = Date.now(), settings = DEFAULT_SETTINGS) {
   const rng = createRng(seed);
@@ -29,7 +29,7 @@ export function createGame(seed = Date.now(), settings = DEFAULT_SETTINGS) {
 
 export function selectCell(state, position) {
   if (state.turn !== Turn.Player || state.winner) return state;
-  if (state.selectedBonus) return useBonus(state, state.selectedBonus, position);
+  if (state.selectedBonus) return useBonusWithTrace(state, state.selectedBonus, position).state;
   const target = getCell(state.cells, position.row, position.col);
   if (target?.owner !== getMovableOwner(Owner.Player)) {
     return { ...state, selected: null, events: [{ type: "MoveRejected", message: "Move red rival crystals to push blue forward." }] };
@@ -68,15 +68,18 @@ export function runAiTurnWithTrace(state) {
     .map((swap) => ({ swap, preview: previewMoveWithCascade(state.cells, swap, Owner.AI) }))
     .sort((a, b) => b.preview.score - a.preview.score);
 
-  const difficulty = state.settings.aiDifficulty / 100;
-  const choiceIndex = Math.min(rated.length - 1, Math.floor((1 - difficulty) * Math.random() * Math.min(8, rated.length)));
+  const weighted = weightAiMoves(rated, state.settings.aiDifficulty);
+  const choiceIndex = chooseWeightedIndex(weighted, Math.random);
   const choice = rated[choiceIndex] ?? rated[0];
 
   return submitSwapTurn(state, choice.swap.from, choice.swap.to, Owner.AI, {
     aiDecision: {
       difficulty: state.settings.aiDifficulty,
+      bias: getAiDifficultyBias(state.settings.aiDifficulty),
       choiceRank: choiceIndex + 1,
+      choiceWeight: Number(weighted[choiceIndex].weight.toFixed(4)),
       consideredMoves: rated.length,
+      weights: weighted.map((entry) => Number(entry.weight.toFixed(4))),
       preview: choice.preview,
     },
   });
@@ -102,6 +105,11 @@ export function getSnapshot(state) {
       ...move,
       from: move.from ? { ...move.from } : null,
       to: move.to ? { ...move.to } : null,
+      bonus: move.bonus ? {
+        type: move.bonus.type,
+        targetIds: [...move.bonus.targetIds],
+        changedIds: [...move.bonus.changedIds],
+      } : null,
       matched: move.matched.map((match) => ({ cascade: match.cascade, ids: [...match.ids] })),
       capturedIds: [...move.capturedIds],
       resultingScores: { ...move.resultingScores },
@@ -113,6 +121,10 @@ export function getSnapshot(state) {
 
 export function submitSwapTurn(state, from, to, actor, options = {}) {
   return applySwapCommandWithTrace(state, from, to, actor, options);
+}
+
+export function submitBonusTurn(state, bonus, position) {
+  return useBonusWithTrace(state, bonus, position);
 }
 
 function applySwapCommand(state, from, to, actor) {
@@ -169,17 +181,13 @@ function applySwapCommandWithTrace(state, from, to, actor, options = {}) {
   }, actor, [{ type: "MoveAccepted", message: actor === Owner.Player ? "You move red crystals." : "AI moves blue crystals." }], trace, options);
 }
 
-function resolveTurn(state, actor, incomingEvents) {
-  return resolveTurnWithTrace(state, actor, incomingEvents).state;
-}
-
-function resolveTurnWithTrace(state, actor, incomingEvents, incomingTrace = [], options = {}) {
+function resolveTurnWithTrace(state, actor, incomingEvents, incomingTrace = [], options = {}, initialMatches = null) {
   let cells = cloneCells(state.cells);
   let totalScore = 0;
   let cascade = 0;
   const events = [...incomingEvents];
   const trace = [...incomingTrace];
-  let matches = findMatchesFromCells(cells, [trace[0]?.from, trace[0]?.to].filter(Boolean));
+  let matches = initialMatches ?? findMatchesFromCells(cells, [trace[0]?.from, trace[0]?.to].filter(Boolean));
 
   while (cascade < 4) {
     if (matches.length === 0) break;
@@ -260,25 +268,68 @@ function resolveTurnWithTrace(state, actor, incomingEvents, incomingTrace = [], 
   };
 }
 
-function useBonus(state, bonus, position) {
+function useBonusWithTrace(state, bonus, position) {
+  if (bonus === Bonus.Mix) return useMixBonusWithTrace(state, position);
+
   const targets = getBonusTargets(state.cells, bonus, position);
-  if (targets.length === 0) return state;
+  if (targets.length === 0) return { state, trace: [] };
 
   const bonuses = { ...state.bonuses, [bonus]: state.bonuses[bonus] - 1 };
-  const baseScore = scoreMatches(targets, Owner.Player) + Math.max(1, Math.floor(targets.length / 3));
-  const cells = refillAfterClear(state.cells, targets, Owner.Player, state.rng);
-  const scores = { ...state.scores, player: state.scores.player + baseScore };
+  const trace = [{
+    type: "bonus",
+    actor: Owner.Player,
+    bonus,
+    targetIds: targets.map((cell) => cell.id),
+    cells: cloneCells(state.cells),
+    message: `${bonus.toUpperCase()} targets ${targets.length} cells.`,
+  }];
 
-  return checkWinner({
+  return resolveTurnWithTrace({
     ...state,
-    cells,
-    scores,
+    cells: state.cells,
     bonuses,
     selected: null,
     selectedBonus: null,
-    turn: Turn.AI,
-    events: [{ type: "BonusUsed", message: `${bonus.toUpperCase()} cleared ${targets.length} cells.` }],
-  });
+  }, Owner.Player, [{ type: "BonusUsed", message: `${bonus.toUpperCase()} cleared ${targets.length} cells.` }], trace, {}, targets);
+}
+
+function useMixBonusWithTrace(state, position) {
+  const targets = getMixTargets(state.cells, position);
+  if (targets.length === 0) return { state, trace: [] };
+
+  const bonuses = { ...state.bonuses, [Bonus.Mix]: state.bonuses[Bonus.Mix] - 1 };
+  const cells = cloneCells(state.cells);
+  const changedPositions = [];
+
+  for (const target of targets) {
+    const cell = getCell(cells, target.row, target.col);
+    const current = cell.crystal;
+    let nextCrystal = pick(CRYSTALS, state.rng);
+    let guard = 0;
+    while (nextCrystal === current && guard < 8) {
+      nextCrystal = pick(CRYSTALS, state.rng);
+      guard += 1;
+    }
+    cell.crystal = nextCrystal;
+    changedPositions.push({ row: cell.row, col: cell.col });
+  }
+
+  const matches = findMatchesFromCells(cells, changedPositions);
+  return resolveTurnWithTrace({
+    ...state,
+    cells,
+    bonuses,
+    selected: null,
+    selectedBonus: null,
+  }, Owner.Player, [{ type: "BonusUsed", message: `MIX changed ${targets.length} crystals.` }], [{
+    type: "mix",
+    actor: Owner.Player,
+    bonus: Bonus.Mix,
+    movableOwner: getMovableOwner(Owner.Player),
+    changedIds: targets.map((cell) => cell.id),
+    cells: cloneCells(cells),
+    message: "MIX reshuffled the local field.",
+  }], {}, matches);
 }
 
 function getBonusTargets(cells, bonus, position) {
@@ -294,7 +345,7 @@ function getBonusTargets(cells, bonus, position) {
   }
 
   if (bonus === Bonus.Mix) {
-    return cells.filter((candidate) => Math.abs(candidate.row - position.row) <= 1 && Math.abs(candidate.col - position.col) <= 1);
+    return getMixTargets(cells, position);
   }
 
   if (bonus === Bonus.Color) {
@@ -302,6 +353,10 @@ function getBonusTargets(cells, bonus, position) {
   }
 
   return [];
+}
+
+function getMixTargets(cells, position) {
+  return cells.filter((candidate) => Math.abs(candidate.row - position.row) <= 2 && Math.abs(candidate.col - position.col) <= 2);
 }
 
 function scoreMatches(matches, actor) {
@@ -328,16 +383,49 @@ function previewMoveWithCascade(cells, swap, actor) {
     matches = findCascadeMatches(previewCells, matches);
   }
 
-  const targetDestroyed = actor === Owner.AI ? playerDestroyed : enemyDestroyed;
-  const ownDestroyed = actor === Owner.AI ? enemyDestroyed : playerDestroyed;
+  const score = actor === Owner.AI
+    ? playerDestroyed * 100 - enemyDestroyed * 100 + cascadeCount * 50
+    : enemyDestroyed * 100 - playerDestroyed * 100 + cascadeCount * 50;
   return {
     createsMatch: cascadeCount > 0,
     playerDestroyed,
     enemyDestroyed,
     cascadeCount,
     capturedCount,
-    score: targetDestroyed * 3 + cascadeCount * 2 + capturedCount - ownDestroyed,
+    score,
   };
+}
+
+function weightAiMoves(rated, difficulty) {
+  if (rated.length <= 1) return rated.map((entry) => ({ ...entry, weight: 1 }));
+
+  const bias = getAiDifficultyBias(difficulty);
+  return rated.map((entry, rankIndex) => {
+    const bestToWorst01 = 1 - rankIndex / (rated.length - 1);
+    const centeredValue = bestToWorst01 - 0.5;
+    return { ...entry, weight: Math.exp(centeredValue * bias) };
+  });
+}
+
+function getAiDifficultyBias(difficulty) {
+  const difficulty01 = (difficulty - 1) / 99;
+  return lerp(-4, 4, difficulty01);
+}
+
+function chooseWeightedIndex(weighted, random) {
+  const totalWeight = weighted.reduce((sum, entry) => sum + entry.weight, 0);
+  let roll = random() * totalWeight;
+
+  for (let index = 0; index < weighted.length; index += 1) {
+    roll -= weighted[index].weight;
+    if (roll <= 0) return index;
+  }
+
+  return Math.max(0, weighted.length - 1);
+}
+
+function lerp(from, to, amount) {
+  return from + (to - from) * amount;
 }
 
 function touchesEnemy(matches, actor) {
@@ -371,6 +459,7 @@ function endOrPassTurn(state, actor) {
 
 function recordAcceptedMove(state, actor, trace, scoreGain, cascades, resultingScores, aiDecision = null) {
   const swap = trace.find((phase) => phase.type === "swap");
+  const bonus = trace.find((phase) => phase.type === "bonus" || phase.type === "mix");
   const matched = trace
     .filter((phase) => phase.type === "match")
     .map((phase) => ({ cascade: phase.cascade, ids: [...phase.matchedIds] }));
@@ -387,6 +476,11 @@ function recordAcceptedMove(state, actor, trace, scoreGain, cascades, resultingS
         movableOwner: swap?.movableOwner ?? getMovableOwner(actor),
         from: swap?.from ? { ...swap.from } : null,
         to: swap?.to ? { ...swap.to } : null,
+        bonus: bonus ? {
+          type: bonus.bonus,
+          targetIds: [...(bonus.targetIds ?? [])],
+          changedIds: [...(bonus.changedIds ?? [])],
+        } : null,
         accepted: true,
         scoreGain,
         cascades,
@@ -395,8 +489,11 @@ function recordAcceptedMove(state, actor, trace, scoreGain, cascades, resultingS
         resultingScores: { ...resultingScores },
         aiDecision: aiDecision ? {
           difficulty: aiDecision.difficulty,
+          bias: aiDecision.bias,
           choiceRank: aiDecision.choiceRank,
+          choiceWeight: aiDecision.choiceWeight,
           consideredMoves: aiDecision.consideredMoves,
+          weights: [...aiDecision.weights],
           preview: { ...aiDecision.preview },
         } : null,
       },

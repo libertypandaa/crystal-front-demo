@@ -1,5 +1,5 @@
 import { Bonus, Owner, Turn } from "../../core/constants.js";
-import { createGame, getSnapshot, restart, runAiTurnWithTrace, selectBonus, selectCell, submitSwapTurn } from "../../core/game.js";
+import { createGame, getSnapshot, restart, runAiTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
 
 let state = createGame(271828);
 let hintMode = false;
@@ -39,6 +39,12 @@ els.board.addEventListener("click", async (event) => {
     row: Number(cell.dataset.row),
     col: Number(cell.dataset.col),
   };
+
+  if (state.selectedBonus && state.turn === Turn.Player) {
+    await commitAnimatedTurn(submitBonusTurn(state, state.selectedBonus, position));
+    await maybeRunAi();
+    return;
+  }
 
   if (state.selected && isAdjacent(state.selected, position) && state.turn === Turn.Player && !state.selectedBonus) {
     await commitAnimatedTurn(submitSwapTurn(state, state.selected, position, Owner.Player));
@@ -264,9 +270,11 @@ function applyPhaseClasses(button, cell, phase) {
   const isMatchedCell = phase.matchedIds?.includes(cell.id);
   const isCapturedCell = phase.capturedIds?.includes(cell.id);
   const isRejectedCell = phase.type === "rejected" && isPosition(cell, phase.from, phase.to);
-  const isAffectedCell = isSwapCell || isMatchedCell || isCapturedCell || isRejectedCell;
+  const isMixedCell = phase.type === "mix" && phase.changedIds?.includes(cell.id);
+  const isBonusCell = phase.type === "bonus" && phase.targetIds?.includes(cell.id);
+  const isAffectedCell = isSwapCell || isMatchedCell || isCapturedCell || isRejectedCell || isMixedCell || isBonusCell;
 
-  const actionOwner = phase.type === "advance" ? phase.actor : phase.movableOwner;
+  const actionOwner = phase.actor;
   button.classList.toggle("is-player-action", actionOwner === Owner.Player && isAffectedCell);
   button.classList.toggle("is-ai-action", actionOwner === Owner.AI && isAffectedCell);
 
@@ -284,6 +292,14 @@ function applyPhaseClasses(button, cell, phase) {
 
   if (phase.type === "advance" && isCapturedCell) {
     button.classList.add("is-captured");
+  }
+
+  if (isMixedCell) {
+    button.classList.add("is-mixing");
+  }
+
+  if (isBonusCell) {
+    button.classList.add("is-bonus-target");
   }
 
   if (isRejectedCell) {
@@ -304,10 +320,12 @@ function wait(ms) {
 }
 
 function getPhaseDuration(phase) {
-  if (phase.type === "swap") return 650;
-  if (phase.type === "match") return 560;
-  if (phase.type === "refill") return 500;
-  if (phase.type === "advance") return 700;
+  if (phase.type === "swap") return 760;
+  if (phase.type === "bonus") return 520;
+  if (phase.type === "mix") return 620;
+  if (phase.type === "match") return 640;
+  if (phase.type === "refill") return 560;
+  if (phase.type === "advance") return 760;
   if (phase.type === "rejected") return 380;
   if (phase.type === "turnEnd") return 240;
   return 240;

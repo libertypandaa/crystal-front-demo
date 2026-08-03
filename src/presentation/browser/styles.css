@@ -266,16 +266,20 @@ button {
   box-shadow: 0 0 0 2px rgba(255, 103, 136, 0.42), 0 0 22px rgba(246, 76, 115, 0.62);
 }
 
+.cell.is-swapping {
+  animation: cell-pulse 760ms ease;
+}
+
 .cell.is-swapping .crystal {
-  animation: crystal-swap 650ms cubic-bezier(0.2, 0.82, 0.22, 1);
+  animation: crystal-swap 760ms cubic-bezier(0.2, 0.82, 0.22, 1);
 }
 
 .cell.is-clearing .crystal {
-  animation: crystal-clear 560ms ease-in forwards;
+  animation: crystal-clear 640ms ease-in forwards;
 }
 
 .cell.is-spawning .crystal {
-  animation: crystal-spawn 500ms cubic-bezier(0.18, 0.88, 0.3, 1.2);
+  animation: crystal-spawn 560ms cubic-bezier(0.18, 0.88, 0.3, 1.2);
 }
 
 .cell.is-rejected .crystal {
@@ -283,7 +287,15 @@ button {
 }
 
 .cell.is-captured {
-  animation: territory-captured 700ms ease;
+  animation: territory-captured 760ms ease;
+}
+
+.cell.is-mixing .crystal {
+  animation: crystal-mix 620ms ease-in-out;
+}
+
+.cell.is-bonus-target .crystal {
+  animation: crystal-bonus-target 520ms ease-out;
 }
 
 .crystal {
@@ -432,6 +444,47 @@ button {
 
   100% {
     transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes cell-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+
+  45% {
+    filter: brightness(1.28);
+  }
+}
+
+@keyframes crystal-mix {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+
+  45% {
+    transform: scale(0.88) rotate(34deg);
+    filter: drop-shadow(0 5px 5px rgba(0, 0, 0, 0.35)) drop-shadow(0 0 18px currentColor);
+  }
+
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes crystal-bonus-target {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.16);
+    filter: drop-shadow(0 5px 5px rgba(0, 0, 0, 0.35)) drop-shadow(0 0 20px currentColor);
+  }
+
+  100% {
+    transform: scale(1);
   }
 }
 
