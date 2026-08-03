@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Crystal Front Demo</title>
-    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.4" />
+    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.5" />
   </head>
   <body>
     <main class="game-shell battle-shell" aria-label="Crystal Front demo">
@@ -34,22 +34,22 @@
 
       <section class="zone zone-bonuses" aria-label="Bonuses">
         <button class="bonus-card" data-bonus="bomb" type="button">
-          <span class="bonus-icon">B</span>
+          <span class="bonus-icon bonus-icon-bomb" aria-hidden="true"></span>
           <strong>BOMB</strong>
           <span id="bonus-bomb">3</span>
         </button>
         <button class="bonus-card" data-bonus="line" type="button">
-          <span class="bonus-icon">+</span>
+          <span class="bonus-icon bonus-icon-line" aria-hidden="true"></span>
           <strong>LINE</strong>
           <span id="bonus-line">3</span>
         </button>
         <button class="bonus-card" data-bonus="mix" type="button">
-          <span class="bonus-icon">M</span>
+          <span class="bonus-icon bonus-icon-mix" aria-hidden="true"></span>
           <strong>MIX</strong>
           <span id="bonus-mix">2</span>
         </button>
         <button class="bonus-card" data-bonus="color" type="button">
-          <span class="bonus-icon">C</span>
+          <span class="bonus-icon bonus-icon-color" aria-hidden="true"></span>
           <strong>COLOR</strong>
           <span id="bonus-color">2</span>
         </button>
@@ -67,7 +67,7 @@
           <span>TARGET</span>
           <strong id="targetScore">50</strong>
         </div>
-        <div class="system-card version">v0.1.4</div>
+        <div class="system-card version">v0.1.5</div>
       </section>
 
       <div id="toast" class="toast" aria-live="polite"></div>
@@ -91,7 +91,7 @@
         <footer class="menu-footer">
           <span id="menuProfile">Rating 1200</span>
           <span id="menuRays">260 Rays</span>
-          <span>v0.1.4</span>
+          <span>v0.1.5</span>
         </footer>
       </div>
     </section>
@@ -273,6 +273,6 @@
       </div>
     </section>
 
-    <script type="module" src="./src/presentation/browser/main.js?v=0.1.4"></script>
+    <script type="module" src="./src/presentation/browser/main.js?v=0.1.5"></script>
   </body>
 </html>
