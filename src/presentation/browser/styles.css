@@ -45,6 +45,7 @@ body {
 }
 
 body[data-view="main"] .battle-shell,
+body[data-view="setup"] .battle-shell,
 body[data-view="pause"] .battle-shell,
 body[data-view="result"] .battle-shell {
   filter: saturate(0.82) brightness(0.72);
@@ -376,7 +377,7 @@ button {
 
 .zone-system {
   display: grid;
-  grid-template-columns: repeat(3, 1fr) 1.15fr 1.15fr 1fr;
+  grid-template-columns: repeat(4, 1fr) 1.15fr 1.15fr 1fr;
   gap: var(--gap);
 }
 
@@ -571,6 +572,65 @@ button {
 .result-grid strong {
   color: var(--gold);
   font-size: clamp(1.3rem, 6vw, 2.1rem);
+}
+
+.control-stack {
+  display: grid;
+  gap: var(--gap);
+}
+
+.control-row {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: clamp(10px, 2svh, 14px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-button);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.control-row span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: clamp(0.78rem, 2.6vw, 0.95rem);
+  font-weight: 700;
+}
+
+.control-row strong {
+  color: var(--gold);
+}
+
+.control-row input[type="range"] {
+  width: 100%;
+  accent-color: var(--player);
+}
+
+.segmented-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.segment {
+  min-height: 48px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-button);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text-secondary);
+  font-size: clamp(0.68rem, 2.2vw, 0.82rem);
+  font-weight: 700;
+}
+
+.segment.is-selected {
+  border-color: rgba(57, 217, 255, 0.64);
+  color: var(--text-primary);
+  background: rgba(25, 170, 245, 0.16);
+}
+
+.segment:disabled {
+  opacity: 0.42;
 }
 
 @keyframes crystal-swap {

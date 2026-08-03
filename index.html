@@ -58,6 +58,7 @@
       <section class="zone zone-system" aria-label="System controls">
         <button id="pauseButton" class="dock-button" type="button">II</button>
         <button id="menuButton" class="dock-button text-button" type="button">MENU</button>
+        <button id="exitButton" class="dock-button text-button" type="button">EXIT</button>
         <button id="restartButton" class="dock-button" type="button">R</button>
         <div class="system-card">
           <span>RAYS</span>
@@ -92,6 +93,40 @@
           <span id="menuRays">260 Rays</span>
           <span>v0.1.0</span>
         </footer>
+      </div>
+    </section>
+
+    <section id="setupMenu" class="screen-layer modal-layer" aria-label="Match setup" hidden>
+      <div class="modal-panel setup-panel">
+        <header class="modal-header">
+          <p>MATCH SETUP</p>
+          <h2>Duel Rules</h2>
+        </header>
+        <div class="control-stack">
+          <label class="control-row">
+            <span>
+              AI Difficulty
+              <strong id="setupAiValue">62</strong>
+            </span>
+            <input id="setupAiDifficulty" type="range" min="1" max="100" value="62" />
+          </label>
+          <label class="control-row">
+            <span>
+              Target Score
+              <strong id="setupTargetValue">1000</strong>
+            </span>
+            <input id="setupTargetScore" type="range" min="50" max="1000" step="50" value="1000" />
+          </label>
+          <div class="segmented-row" aria-label="Victory mode">
+            <button class="segment is-selected" type="button">Score Target</button>
+            <button class="segment" type="button" disabled>Last Move</button>
+            <button class="segment" type="button" disabled>AI Duel</button>
+          </div>
+        </div>
+        <div class="menu-actions compact">
+          <button id="setupStartButton" class="menu-button primary" type="button">Start Duel</button>
+          <button id="setupBackButton" class="menu-button" type="button">Back</button>
+        </div>
       </div>
     </section>
 

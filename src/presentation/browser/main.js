@@ -5,6 +5,8 @@ let state = createGame(271828);
 let isAnimating = false;
 let appView = "main";
 let hasStartedMatch = false;
+let pendingSettings = { ...state.settings };
+let setupReturnView = "main";
 
 window.crystalFrontDebug = {
   getSnapshot: () => getSnapshot(state),
@@ -27,9 +29,11 @@ const els = {
   targetScore: document.querySelector("#targetScore"),
   toast: document.querySelector("#toast"),
   restartButton: document.querySelector("#restartButton"),
+  exitButton: document.querySelector("#exitButton"),
   menuButton: document.querySelector("#menuButton"),
   pauseButton: document.querySelector("#pauseButton"),
   mainMenu: document.querySelector("#mainMenu"),
+  setupMenu: document.querySelector("#setupMenu"),
   pauseMenu: document.querySelector("#pauseMenu"),
   resultMenu: document.querySelector("#resultMenu"),
   playButton: document.querySelector("#playButton"),
@@ -40,6 +44,12 @@ const els = {
   settingsButton: document.querySelector("#settingsButton"),
   menuProfile: document.querySelector("#menuProfile"),
   menuRays: document.querySelector("#menuRays"),
+  setupAiDifficulty: document.querySelector("#setupAiDifficulty"),
+  setupAiValue: document.querySelector("#setupAiValue"),
+  setupTargetScore: document.querySelector("#setupTargetScore"),
+  setupTargetValue: document.querySelector("#setupTargetValue"),
+  setupStartButton: document.querySelector("#setupStartButton"),
+  setupBackButton: document.querySelector("#setupBackButton"),
   resumeButton: document.querySelector("#resumeButton"),
   pauseRestartButton: document.querySelector("#pauseRestartButton"),
   pauseSettingsButton: document.querySelector("#pauseSettingsButton"),
@@ -94,6 +104,11 @@ els.restartButton.addEventListener("click", () => {
   restartMatch();
 });
 
+els.exitButton.addEventListener("click", () => {
+  if (isAnimating) return;
+  openMainMenu();
+});
+
 els.pauseButton.addEventListener("click", () => {
   openPauseMenu();
 });
@@ -112,12 +127,31 @@ els.continueButton.addEventListener("click", () => {
   render();
 });
 
-els.setupButton.addEventListener("click", () => showComingNext("Match Setup"));
+els.setupButton.addEventListener("click", () => openSetupMenu("main"));
 els.shopButton.addEventListener("click", () => showComingNext("Shop"));
 els.leaderboardButton.addEventListener("click", () => showComingNext("Leaderboard"));
 els.settingsButton.addEventListener("click", () => showComingNext("Settings"));
 els.pauseSettingsButton.addEventListener("click", () => showComingNext("Settings"));
-els.resultSetupButton.addEventListener("click", () => showComingNext("Match Setup"));
+els.resultSetupButton.addEventListener("click", () => openSetupMenu("result"));
+els.setupAiDifficulty.addEventListener("input", () => {
+  pendingSettings = {
+    ...pendingSettings,
+    aiDifficulty: Number(els.setupAiDifficulty.value),
+  };
+  renderSetupValues();
+});
+els.setupTargetScore.addEventListener("input", () => {
+  pendingSettings = {
+    ...pendingSettings,
+    targetScore: Number(els.setupTargetScore.value),
+  };
+  renderSetupValues();
+});
+els.setupStartButton.addEventListener("click", () => startNewMatch());
+els.setupBackButton.addEventListener("click", () => {
+  appView = setupReturnView;
+  render();
+});
 els.resumeButton.addEventListener("click", () => {
   appView = "battle";
   render();
@@ -199,11 +233,13 @@ function render(snapshot = getSnapshot(state), phase = null) {
 function updateScreens(snapshot) {
   document.body.dataset.view = appView;
   els.mainMenu.hidden = appView !== "main";
+  els.setupMenu.hidden = appView !== "setup";
   els.pauseMenu.hidden = appView !== "pause";
   els.resultMenu.hidden = appView !== "result";
   els.continueButton.disabled = !hasStartedMatch;
   els.menuProfile.textContent = `Rating ${snapshot.profile.rating}`;
   els.menuRays.textContent = `${snapshot.profile.rays} Rays`;
+  renderSetupValues();
   updateResult(snapshot);
 }
 
@@ -223,7 +259,7 @@ function updateResult(snapshot) {
 }
 
 function startNewMatch() {
-  state = restart(state);
+  state = createGame(Date.now(), pendingSettings);
   hasStartedMatch = true;
   appView = "battle";
   render();
@@ -248,6 +284,20 @@ function openMainMenu() {
   render();
 }
 
+function openSetupMenu() {
+  pendingSettings = { ...state.settings };
+  setupReturnView = appView === "result" ? "result" : "main";
+  appView = "setup";
+  render();
+}
+
+function renderSetupValues() {
+  els.setupAiDifficulty.value = String(pendingSettings.aiDifficulty);
+  els.setupAiValue.textContent = pendingSettings.aiDifficulty;
+  els.setupTargetScore.value = String(pendingSettings.targetScore);
+  els.setupTargetValue.textContent = pendingSettings.targetScore;
+}
+
 function showComingNext(label) {
   showToast(`${label} coming next.`);
 }
@@ -256,7 +306,7 @@ function formatTurn(snapshot) {
   if (snapshot.winner === Owner.Player) return "Victory";
   if (snapshot.winner === Owner.AI) return "Defeat";
   if (snapshot.winner === "draw") return "Draw";
-  return snapshot.turn === Turn.Player ? `Player move · ${snapshot.legalMoves} options` : "AI thinking";
+  return snapshot.turn === Turn.Player ? `Player move - ${snapshot.legalMoves} options` : "AI thinking";
 }
 
 function showToast(message) {
