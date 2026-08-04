@@ -9,7 +9,7 @@
   --metal-high: #2a3440;
   --arena-stone: #151b24;
   --arena-cut: #273240;
-  --arena-bg: url("../../../assets/concepts/arena-clean-v1/source/arena-background.png");
+  --arena-bg: url("../../../assets/runtime/arena-background-mobile.webp");
   --border-subtle: rgba(157, 204, 255, 0.2);
   --border-strong: rgba(230, 189, 102, 0.72);
   --text-primary: #f8fbff;
@@ -385,13 +385,13 @@ button:focus-visible {
       rgba(255, 85, 122, 0.58) 42%,
       transparent 60%
     );
-  background-position: 0 0, -120% 0;
-  background-size: 100% 100%, 220% 100%;
+  background-size: 100% 100%, 100% 100%;
   filter: blur(0.2px);
   box-shadow: 0 0 14px var(--player), 0 0 18px var(--opponent), 0 0 30px rgba(255, 255, 255, 0.16);
   content: "";
-  animation: frontier-flow 2600ms linear infinite;
+  animation: frontier-pulse 2400ms ease-in-out infinite;
   pointer-events: none;
+  will-change: opacity;
 }
 
 .cell {
@@ -498,8 +498,7 @@ button:focus-visible {
   width: 62%;
   height: 78%;
   clip-path: polygon(50% 0%, 82% 20%, 96% 58%, 50% 100%, 4% 58%, 18% 20%);
-  filter: drop-shadow(0 5px 5px rgba(0, 0, 0, 0.38)) drop-shadow(0 0 9px currentColor);
-  animation: crystal-idle 3200ms ease-in-out infinite;
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.34));
 }
 
 .crystal::before {
@@ -507,8 +506,8 @@ button:focus-visible {
   inset: -18% -70%;
   background: linear-gradient(100deg, transparent 35%, rgba(255, 255, 255, 0.48) 47%, transparent 58%);
   content: "";
+  opacity: 0;
   transform: translateX(-42%) rotate(8deg);
-  animation: crystal-glint 3600ms ease-in-out infinite;
 }
 
 .crystal::after {
@@ -539,6 +538,22 @@ button:focus-visible {
 .crystal-cyan .crystal {
   color: var(--crystal-cyan);
   background: linear-gradient(135deg, #d5fbff, var(--crystal-cyan) 45%, #0475a7);
+}
+
+.cell.is-selected:not(.is-swapping):not(.is-clearing):not(.is-spawning):not(.is-rejected) .crystal {
+  filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.36)) drop-shadow(0 0 10px currentColor);
+  animation: crystal-idle 2400ms ease-in-out infinite;
+}
+
+.cell.is-player-action .crystal,
+.cell.is-ai-action .crystal {
+  filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.36)) drop-shadow(0 0 12px currentColor);
+}
+
+.cell.is-selected:not(.is-swapping):not(.is-clearing):not(.is-spawning):not(.is-rejected) .crystal::before,
+.cell.is-player-action .crystal::before,
+.cell.is-ai-action .crystal::before {
+  animation: crystal-glint 1200ms ease-in-out 1;
 }
 
 .zone-bonuses {
@@ -635,7 +650,7 @@ button:focus-visible {
     radial-gradient(circle, #fff2a4 0 15%, #ffad38 16% 34%, transparent 35%),
     linear-gradient(135deg, transparent 0 46%, #ffad38 47% 54%, transparent 55%);
   filter: drop-shadow(0 0 8px rgba(255, 176, 58, 0.85));
-  animation: bonus-spark 950ms ease-in-out infinite;
+  animation: bonus-spark 1500ms ease-in-out infinite;
 }
 
 .bonus-icon-line::before {
@@ -645,7 +660,7 @@ button:focus-visible {
   background: linear-gradient(180deg, #e8fbff, var(--crystal-cyan) 38%, #0b66ff);
   box-shadow: 0 0 13px rgba(57, 217, 255, 0.85);
   transform: rotate(39deg);
-  animation: bonus-line-pulse 1200ms ease-in-out infinite;
+  animation: bonus-line-pulse 1600ms ease-in-out infinite;
 }
 
 .bonus-icon-line::after {
@@ -654,7 +669,7 @@ button:focus-visible {
   border-radius: 999px;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.9), transparent);
   transform: rotate(39deg);
-  animation: bonus-line-shine 1200ms ease-in-out infinite;
+  animation: bonus-line-shine 1600ms ease-in-out infinite;
 }
 
 .bonus-icon-mix::before {
@@ -663,7 +678,7 @@ button:focus-visible {
   background: conic-gradient(from 35deg, #ffcc38, #62db37, #39d9ff, #b15cff, #ff557a, #ffcc38);
   box-shadow: 0 0 15px rgba(177, 92, 255, 0.5);
   mask: radial-gradient(circle, transparent 0 28%, #000 29% 56%, transparent 57%);
-  animation: bonus-mix-spin 2600ms linear infinite;
+  animation: bonus-mix-spin 4200ms linear infinite;
 }
 
 .bonus-icon-mix::after {
@@ -1097,13 +1112,14 @@ button:focus-visible {
   }
 }
 
-@keyframes frontier-flow {
-  0% {
-    background-position: 0 0, -120% 0;
+@keyframes frontier-pulse {
+  0%,
+  100% {
+    opacity: 0.86;
   }
 
-  100% {
-    background-position: 0 0, 120% 0;
+  50% {
+    opacity: 1;
   }
 }
 
@@ -1152,11 +1168,13 @@ button:focus-visible {
 @keyframes bonus-line-pulse {
   0%,
   100% {
-    filter: brightness(1) drop-shadow(0 0 9px rgba(57, 217, 255, 0.7));
+    opacity: 0.86;
+    transform: rotate(39deg) scale(1);
   }
 
   50% {
-    filter: brightness(1.4) drop-shadow(0 0 16px rgba(57, 217, 255, 1));
+    opacity: 1;
+    transform: rotate(39deg) scale(1.08);
   }
 }
 
