@@ -261,7 +261,14 @@ function render(snapshot = getSnapshot(state), phase = null) {
     button.setAttribute("aria-label", `${cell.owner} ${cell.crystal} crystal at ${cell.row + 1}, ${cell.col + 1}`);
     button.classList.toggle("is-selected", snapshot.selected?.row === cell.row && snapshot.selected?.col === cell.col);
     applyPhaseClasses(button, cell, phase);
-    button.innerHTML = `<span class="crystal" aria-hidden="true"></span>`;
+    button.innerHTML = `
+      <span class="crystal" aria-hidden="true">
+        <span class="crystal-core"></span>
+        <span class="crystal-shard shard-a"></span>
+        <span class="crystal-shard shard-b"></span>
+        <span class="crystal-shard shard-c"></span>
+      </span>
+    `;
     els.board.append(button);
   }
 
@@ -521,15 +528,18 @@ function makeSnapshot(cells) {
 }
 
 function applyPhaseClasses(button, cell, phase) {
+  button.classList.add("is-idle");
   if (!phase) return;
 
   const isSwapCell = phase.type === "swap" && isPosition(cell, phase.from, phase.to);
   const isMatchedCell = phase.matchedIds?.includes(cell.id);
   const isCapturedCell = phase.capturedIds?.includes(cell.id);
+  const isMovedCell = phase.movedIds?.includes(cell.id);
+  const isSpawnedCell = phase.spawnedIds?.includes(cell.id);
   const isRejectedCell = phase.type === "rejected" && isPosition(cell, phase.from, phase.to);
   const isMixedCell = phase.type === "mix" && phase.changedIds?.includes(cell.id);
   const isBonusCell = phase.type === "bonus" && phase.targetIds?.includes(cell.id);
-  const isAffectedCell = isSwapCell || isMatchedCell || isCapturedCell || isRejectedCell || isMixedCell || isBonusCell;
+  const isAffectedCell = isSwapCell || isMatchedCell || isCapturedCell || isMovedCell || isSpawnedCell || isRejectedCell || isMixedCell || isBonusCell;
 
   const actionOwner = phase.actor;
   button.classList.toggle("is-player-action", actionOwner === Owner.Player && isAffectedCell);
@@ -537,14 +547,26 @@ function applyPhaseClasses(button, cell, phase) {
 
   if (isSwapCell) {
     button.classList.add("is-swapping");
+    button.classList.add(getSwapDirectionClass(cell, phase));
+    button.classList.remove("is-idle");
   }
 
   if (phase.type === "match" && isMatchedCell) {
     button.classList.add("is-clearing");
+    button.classList.add("is-destroying");
+    button.classList.remove("is-idle");
   }
 
-  if (phase.type === "refill" && isMatchedCell) {
+  if (phase.type === "refill" && isMovedCell) {
+    button.classList.add("is-refill-moving");
+    button.classList.add(phase.actor === Owner.Player ? "move-from-bottom" : "move-from-top");
+    button.classList.remove("is-idle");
+  }
+
+  if (phase.type === "refill" && isSpawnedCell) {
     button.classList.add("is-spawning");
+    button.classList.add(phase.actor === Owner.Player ? "move-from-bottom" : "move-from-top");
+    button.classList.remove("is-idle");
   }
 
   if (phase.type === "advance" && isCapturedCell) {
@@ -553,15 +575,31 @@ function applyPhaseClasses(button, cell, phase) {
 
   if (isMixedCell) {
     button.classList.add("is-mixing");
+    button.classList.remove("is-idle");
   }
 
   if (isBonusCell) {
     button.classList.add("is-bonus-target");
+    button.classList.remove("is-idle");
   }
 
   if (isRejectedCell) {
     button.classList.add("is-rejected");
+    button.classList.add(getSwapDirectionClass(cell, phase));
+    button.classList.remove("is-idle");
   }
+}
+
+function getSwapDirectionClass(cell, phase) {
+  const counterpart = isPosition(cell, phase.from) ? phase.to : phase.from;
+  if (!counterpart) return "move-horizontal";
+  const rowDelta = counterpart.row - cell.row;
+  const colDelta = counterpart.col - cell.col;
+  if (rowDelta > 0) return "move-from-top";
+  if (rowDelta < 0) return "move-from-bottom";
+  if (colDelta > 0) return "move-from-right";
+  if (colDelta < 0) return "move-from-left";
+  return "move-horizontal";
 }
 
 function isPosition(cell, ...positions) {
@@ -577,11 +615,11 @@ function wait(ms) {
 }
 
 function getPhaseDuration(phase) {
-  if (phase.type === "swap") return 760;
+  if (phase.type === "swap") return 700;
   if (phase.type === "bonus") return 520;
   if (phase.type === "mix") return 620;
-  if (phase.type === "match") return 640;
-  if (phase.type === "refill") return 560;
+  if (phase.type === "match") return 760;
+  if (phase.type === "refill") return 700;
   if (phase.type === "advance") return 760;
   if (phase.type === "rejected") return 380;
   if (phase.type === "turnEnd") return 240;

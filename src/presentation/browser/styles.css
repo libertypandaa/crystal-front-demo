@@ -461,19 +461,43 @@ button:focus-visible {
 }
 
 .cell.is-swapping {
-  animation: cell-pulse 760ms ease;
+  animation: cell-pulse 700ms ease;
 }
 
 .cell.is-swapping .crystal {
-  animation: crystal-swap 760ms cubic-bezier(0.2, 0.82, 0.22, 1);
+  animation: crystal-move 700ms cubic-bezier(0.17, 0.84, 0.28, 1);
 }
 
 .cell.is-clearing .crystal {
-  animation: crystal-clear 640ms ease-in forwards;
+  animation: crystal-destroy 760ms cubic-bezier(0.24, 0.74, 0.32, 1) forwards;
+}
+
+.cell.is-clearing .crystal::before {
+  animation: crystal-burst 760ms ease-out forwards;
+}
+
+.cell.is-clearing .crystal-shard {
+  opacity: 1;
+}
+
+.cell.is-clearing .shard-a {
+  animation: shard-a 760ms ease-out forwards;
+}
+
+.cell.is-clearing .shard-b {
+  animation: shard-b 760ms ease-out forwards;
+}
+
+.cell.is-clearing .shard-c {
+  animation: shard-c 760ms ease-out forwards;
+}
+
+.cell.is-refill-moving .crystal {
+  animation: crystal-refill-move 700ms cubic-bezier(0.17, 0.84, 0.28, 1);
 }
 
 .cell.is-spawning .crystal {
-  animation: crystal-spawn 560ms cubic-bezier(0.18, 0.88, 0.3, 1.2);
+  animation: crystal-spawn 700ms cubic-bezier(0.18, 0.88, 0.3, 1.2);
 }
 
 .cell.is-rejected .crystal {
@@ -499,25 +523,54 @@ button:focus-visible {
   height: 78%;
   clip-path: polygon(50% 0%, 82% 20%, 96% 58%, 50% 100%, 4% 58%, 18% 20%);
   filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.34));
+  transform: translate3d(0, 0, 0);
+  will-change: transform, opacity;
 }
 
 .crystal::before {
   position: absolute;
   inset: -18% -70%;
+  z-index: 2;
   background: linear-gradient(100deg, transparent 35%, rgba(255, 255, 255, 0.48) 47%, transparent 58%);
   content: "";
   opacity: 0;
   transform: translateX(-42%) rotate(8deg);
 }
 
-.crystal::after {
-  position: relative;
+.crystal-core {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   display: block;
-  width: 100%;
-  height: 100%;
   clip-path: polygon(50% 0%, 62% 24%, 86% 58%, 50% 100%, 14% 58%, 38% 24%);
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.34), transparent 38%, rgba(0, 0, 0, 0.16));
   content: "";
+}
+
+.crystal-shard {
+  position: absolute;
+  z-index: 3;
+  width: 34%;
+  height: 30%;
+  clip-path: polygon(48% 0, 100% 45%, 62% 100%, 0 72%);
+  background: currentColor;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.shard-a {
+  top: 14%;
+  left: 10%;
+}
+
+.shard-b {
+  top: 42%;
+  right: 5%;
+}
+
+.shard-c {
+  right: 28%;
+  bottom: 7%;
 }
 
 .crystal-yellow .crystal {
@@ -1097,18 +1150,50 @@ button:focus-visible {
   accent-color: var(--player);
 }
 
-@keyframes crystal-swap {
+.move-from-top {
+  --move-x: 0%;
+  --move-y: -86%;
+}
+
+.move-from-bottom {
+  --move-x: 0%;
+  --move-y: 86%;
+}
+
+.move-from-left {
+  --move-x: -86%;
+  --move-y: 0%;
+}
+
+.move-from-right {
+  --move-x: 86%;
+  --move-y: 0%;
+}
+
+.move-horizontal {
+  --move-x: 70%;
+  --move-y: 0%;
+}
+
+@keyframes crystal-move {
   0% {
-    transform: scale(1) translateY(0);
+    opacity: 0.76;
+    transform: translate3d(var(--move-x, 0%), var(--move-y, 0%), 0) scale(0.94) rotate(-4deg);
   }
 
-  45% {
-    transform: scale(1.12) translateY(-14%);
+  38% {
+    opacity: 1;
+    transform: translate3d(calc(var(--move-x, 0%) * -0.08), calc(var(--move-y, 0%) * -0.08), 0) scale(1.12) rotate(3deg);
     filter: drop-shadow(0 7px 7px rgba(0, 0, 0, 0.38)) drop-shadow(0 0 16px currentColor);
   }
 
+  68% {
+    transform: translate3d(0, 0, 0) scale(0.97) rotate(-1deg);
+  }
+
   100% {
-    transform: scale(1) translateY(0);
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
   }
 }
 
@@ -1126,11 +1211,11 @@ button:focus-visible {
 @keyframes crystal-idle {
   0%,
   100% {
-    transform: translateY(0) scale(1);
+    transform: translate3d(0, 0, 0) scale(1);
   }
 
   50% {
-    transform: translateY(-2%) scale(1.025);
+    transform: translate3d(0, -2%, 0) scale(1.025);
   }
 }
 
@@ -1264,36 +1349,114 @@ button:focus-visible {
   }
 }
 
-@keyframes crystal-clear {
+@keyframes crystal-refill-move {
+  0% {
+    opacity: 0.78;
+    transform: translate3d(var(--move-x, 0%), var(--move-y, 0%), 0) scale(0.88);
+  }
+
+  44% {
+    opacity: 1;
+    transform: translate3d(calc(var(--move-x, 0%) * -0.05), calc(var(--move-y, 0%) * -0.05), 0) scale(1.1);
+    filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.36)) drop-shadow(0 0 14px currentColor);
+  }
+
+  72% {
+    transform: translate3d(0, 0, 0) scale(0.97);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes crystal-destroy {
   0% {
     opacity: 1;
     transform: scale(1) rotate(0deg);
   }
 
-  70% {
-    opacity: 0.85;
-    transform: scale(1.18) rotate(8deg);
+  28% {
+    opacity: 1;
+    transform: scale(1.18) rotate(4deg);
+    filter: drop-shadow(0 5px 5px rgba(0, 0, 0, 0.35)) drop-shadow(0 0 24px currentColor);
+  }
+
+  54% {
+    opacity: 0.82;
+    transform: scale(0.92) rotate(-7deg);
   }
 
   100% {
     opacity: 0;
-    transform: scale(0.15) rotate(22deg);
+    transform: scale(0.18) rotate(22deg);
+  }
+}
+
+@keyframes crystal-burst {
+  0% {
+    opacity: 0;
+    transform: translateX(-52%) rotate(8deg) scaleX(0.7);
+  }
+
+  24% {
+    opacity: 1;
+    transform: translateX(0%) rotate(8deg) scaleX(1.2);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(64%) rotate(8deg) scaleX(0.55);
+  }
+}
+
+@keyframes shard-a {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(0.6);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(-72%, -88%, 0) rotate(-42deg) scale(0.18);
+  }
+}
+
+@keyframes shard-b {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(0.62);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(74%, -36%, 0) rotate(58deg) scale(0.16);
+  }
+}
+
+@keyframes shard-c {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(0.58);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(18%, 78%, 0) rotate(36deg) scale(0.14);
   }
 }
 
 @keyframes crystal-spawn {
   0% {
     opacity: 0;
-    transform: translateY(-55%) scale(0.72);
+    transform: translate3d(calc(var(--move-x, 0%) * 0.35), calc(var(--move-y, -86%) * 0.92), 0) scale(0.62);
   }
 
-  70% {
+  60% {
     opacity: 1;
-    transform: translateY(8%) scale(1.08);
+    transform: translate3d(0, 8%, 0) scale(1.1);
   }
 
   100% {
-    transform: translateY(0) scale(1);
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 

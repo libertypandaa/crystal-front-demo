@@ -217,6 +217,8 @@ function resolveTurnWithTrace(state, actor, incomingEvents, incomingTrace = [], 
       cascade,
       matchedIds: matches.map((cell) => cell.id),
       capturedIds: refill.capturedIds,
+      movedIds: refill.movedIds,
+      spawnedIds: refill.spawnedIds,
       cells: cloneCells(cells),
       message: cascade > 1 ? `Cascade refill x${cascade}` : "Front advances.",
     });

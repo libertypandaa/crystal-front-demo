@@ -130,16 +130,18 @@ export function refillAfterClearWithCapture(cells, matchedCells, actor, rng) {
   const next = cloneCells(cells);
   const cleared = new Set(matchedCells.map((cell) => cell.id));
   const capturedIds = [];
+  const movedIds = [];
+  const spawnedIds = [];
 
   for (let col = 0; col < BOARD_SIZE; col += 1) {
     if (actor === Owner.Player) {
-      refillColumnTowardTop(cells, next, cleared, col, actor, rng, capturedIds);
+      refillColumnTowardTop(cells, next, cleared, col, actor, rng, capturedIds, movedIds, spawnedIds);
     } else {
-      refillColumnTowardBottom(cells, next, cleared, col, actor, rng, capturedIds);
+      refillColumnTowardBottom(cells, next, cleared, col, actor, rng, capturedIds, movedIds, spawnedIds);
     }
   }
 
-  return { cells: next, capturedIds };
+  return { cells: next, capturedIds, movedIds, spawnedIds };
 }
 
 export function findLegalSwaps(cells, actor = null) {
@@ -221,7 +223,7 @@ function getVerticalRun(cells, target) {
   return run;
 }
 
-function refillColumnTowardTop(original, next, cleared, col, actor, rng, capturedIds) {
+function refillColumnTowardTop(original, next, cleared, col, actor, rng, capturedIds, movedIds, spawnedIds) {
   const survivors = [];
   for (let row = 0; row < BOARD_SIZE; row += 1) {
     const cell = getCell(next, row, col);
@@ -235,15 +237,17 @@ function refillColumnTowardTop(original, next, cleared, col, actor, rng, capture
     if (source) {
       target.crystal = source.crystal;
       target.owner = source.owner;
+      if (source.id !== target.id) movedIds.push(target.id);
     } else {
       target.crystal = pick(CRYSTALS, rng);
       target.owner = actor;
+      spawnedIds.push(target.id);
     }
     collectCapturedId(target, beforeOwner, actor, capturedIds);
   }
 }
 
-function refillColumnTowardBottom(original, next, cleared, col, actor, rng, capturedIds) {
+function refillColumnTowardBottom(original, next, cleared, col, actor, rng, capturedIds, movedIds, spawnedIds) {
   const survivors = [];
   for (let row = BOARD_SIZE - 1; row >= 0; row -= 1) {
     const cell = getCell(next, row, col);
@@ -257,9 +261,11 @@ function refillColumnTowardBottom(original, next, cleared, col, actor, rng, capt
     if (source) {
       target.crystal = source.crystal;
       target.owner = source.owner;
+      if (source.id !== target.id) movedIds.push(target.id);
     } else {
       target.crystal = pick(CRYSTALS, rng);
       target.owner = actor;
+      spawnedIds.push(target.id);
     }
     collectCapturedId(target, beforeOwner, actor, capturedIds);
   }
