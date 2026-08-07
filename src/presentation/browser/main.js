@@ -41,6 +41,7 @@ window.crystalFrontDebug = {
 
 const els = {
   board: document.querySelector("#board"),
+  combatCue: document.querySelector("#combatCue"),
   playerScore: document.querySelector("#playerScore"),
   aiScore: document.querySelector("#aiScore"),
   turnNumber: document.querySelector("#turnNumber"),
@@ -202,7 +203,12 @@ function handleMenuAction(action, sourceButton) {
 
 async function maybeRunAi() {
   if (appView !== "battle" || state.turn !== Turn.AI || state.winner) return;
+  isAnimating = true;
+  document.body.classList.add("is-animating");
+  render(getSnapshot(state), { type: "thinking", actor: Owner.AI, message: "AI evaluating attack." });
   await wait(520);
+  isAnimating = false;
+  document.body.classList.remove("is-animating");
   if (appView !== "battle") return;
   await commitAnimatedTurn(runAiTurnWithTrace(state));
 }
@@ -236,6 +242,7 @@ function render(snapshot = getSnapshot(state), phase = null) {
   els.aiScore.textContent = snapshot.scores.ai;
   els.turnNumber.textContent = snapshot.turnNumber;
   els.turnOwner.textContent = formatTurn(snapshot);
+  updateCombatCue(snapshot, phase);
   els.aiDifficulty.textContent = `AI ${snapshot.settings.aiDifficulty}`;
   els.playerRating.textContent = `Rating ${snapshot.profile.rating}`;
   els.rays.textContent = snapshot.profile.rays;
@@ -547,6 +554,8 @@ function applyPhaseClasses(button, cell, phase) {
 
   if (isSwapCell) {
     button.classList.add("is-swapping");
+    button.classList.toggle("is-swap-from", isPosition(cell, phase.from));
+    button.classList.toggle("is-swap-to", isPosition(cell, phase.to));
     button.classList.add(getSwapDirectionClass(cell, phase));
     button.classList.remove("is-idle");
   }
@@ -585,9 +594,39 @@ function applyPhaseClasses(button, cell, phase) {
 
   if (isRejectedCell) {
     button.classList.add("is-rejected");
+    button.classList.toggle("is-swap-from", isPosition(cell, phase.from));
+    button.classList.toggle("is-swap-to", isPosition(cell, phase.to));
     button.classList.add(getSwapDirectionClass(cell, phase));
     button.classList.remove("is-idle");
   }
+}
+
+function updateCombatCue(snapshot, phase) {
+  const actor = phase?.actor ?? (snapshot.turn === Turn.Player ? Owner.Player : Owner.AI);
+  els.combatCue.className = `combat-cue ${actor === Owner.Player ? "cue-player" : "cue-ai"}`;
+  els.combatCue.textContent = getCombatCueText(snapshot, phase);
+}
+
+function getCombatCueText(snapshot, phase) {
+  if (snapshot.winner === Owner.Player) return "VICTORY";
+  if (snapshot.winner === Owner.AI) return "DEFEAT";
+  if (snapshot.winner === "draw") return "DRAW";
+  if (!phase) return snapshot.turn === Turn.Player ? `YOU ATTACK - ${snapshot.legalMoves} MOVES` : "AI ATTACK";
+  if (phase.type === "thinking") return "AI EVALUATING";
+  if (phase.type === "swap") return `${phase.actor === Owner.Player ? "YOU" : "AI"} SWAP ${formatCell(phase.from)} -> ${formatCell(phase.to)}`;
+  if (phase.type === "rejected") return "SWAP REJECTED";
+  if (phase.type === "bonus") return `${phase.bonus?.toUpperCase() ?? "BONUS"} TARGET`;
+  if (phase.type === "mix") return "MIX FIELD";
+  if (phase.type === "match") return phase.cascade > 1 ? `CASCADE ${phase.cascade} - ${phase.matchedIds?.length ?? 0}` : `MATCH - ${phase.matchedIds?.length ?? 0}`;
+  if (phase.type === "refill") return `FRONT MOVES - ${phase.movedIds?.length ?? 0} SHIFT`;
+  if (phase.type === "advance") return `CAPTURE +${phase.capturedIds?.length ?? 0}`;
+  if (phase.type === "noMoves") return "NO MOVES";
+  return snapshot.turn === Turn.Player ? "YOU ATTACK" : "AI ATTACK";
+}
+
+function formatCell(position) {
+  if (!position) return "--";
+  return `${position.col + 1}:${position.row + 1}`;
 }
 
 function getSwapDirectionClass(cell, phase) {

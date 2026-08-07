@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Crystal Front Demo</title>
-    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.8" />
+    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.9" />
   </head>
   <body>
     <main class="game-shell battle-shell" aria-label="Crystal Front demo">
@@ -28,6 +28,7 @@
 
       <section class="zone zone-board" aria-label="Crystal board">
         <div class="board-wrap">
+          <div id="combatCue" class="combat-cue" aria-live="polite">YOU ATTACK</div>
           <div id="board" class="board" role="grid" aria-label="8 by 8 crystal front board"></div>
         </div>
       </section>
@@ -67,7 +68,7 @@
           <span>TARGET</span>
           <strong id="targetScore">50</strong>
         </div>
-        <div class="system-card version">v0.1.8</div>
+        <div class="system-card version">v0.1.9</div>
       </section>
 
       <div id="toast" class="toast" aria-live="polite"></div>
@@ -91,7 +92,7 @@
         <footer class="menu-footer">
           <span id="menuProfile">Rating 1200</span>
           <span id="menuRays">260 Rays</span>
-          <span>v0.1.8</span>
+          <span>v0.1.9</span>
         </footer>
       </div>
     </section>
@@ -273,6 +274,6 @@
       </div>
     </section>
 
-    <script type="module" src="./src/presentation/browser/main.js?v=0.1.8"></script>
+    <script type="module" src="./src/presentation/browser/main.js?v=0.1.9"></script>
   </body>
 </html>
