@@ -938,6 +938,10 @@ button:focus-visible {
   overflow: auto;
 }
 
+#shopMenu .menu-scroll-panel {
+  width: min(100%, 460px);
+}
+
 .menu-header,
 .modal-header {
   display: grid;
@@ -1108,6 +1112,46 @@ button:focus-visible {
   gap: 8px;
 }
 
+.shop-section {
+  display: grid;
+  gap: 8px;
+}
+
+.shop-section h3 {
+  margin: 4px 2px 0;
+  color: var(--gold);
+  font-size: clamp(0.72rem, 2.3vw, 0.84rem);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.shop-balance {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.shop-balance div {
+  display: grid;
+  min-height: 74px;
+  place-items: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-button);
+  background:
+    linear-gradient(180deg, rgba(25, 170, 245, 0.12), rgba(255, 255, 255, 0.025)),
+    rgba(255, 255, 255, 0.035);
+}
+
+.shop-balance span {
+  color: var(--text-secondary);
+  font-size: clamp(0.66rem, 2.2vw, 0.78rem);
+  font-weight: 700;
+}
+
+.shop-balance strong {
+  color: var(--gold);
+  font-size: clamp(1.35rem, 5.4vw, 2.15rem);
+}
+
 .item-row,
 .rank-row,
 .profile-strip,
@@ -1124,6 +1168,22 @@ button:focus-visible {
   align-items: center;
   min-width: 0;
   padding: 10px;
+}
+
+.shop-item {
+  min-height: 70px;
+  background:
+    linear-gradient(90deg, rgba(25, 170, 245, 0.08), transparent 45%, rgba(246, 76, 115, 0.06)),
+    rgba(255, 255, 255, 0.035);
+}
+
+.shop-reward {
+  border-color: rgba(57, 217, 255, 0.45);
+}
+
+.shop-pack {
+  border-style: dashed;
+  opacity: 0.86;
 }
 
 .item-row div:first-child,
@@ -1147,6 +1207,7 @@ button:focus-visible {
 
 .item-buy {
   justify-items: center;
+  min-width: 76px;
 }
 
 .item-buy > span {

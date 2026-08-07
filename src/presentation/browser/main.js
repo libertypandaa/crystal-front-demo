@@ -1,7 +1,13 @@
 import { Bonus, Owner, Turn } from "../../core/constants.js";
 import { createGame, getSnapshot, restart, runAiTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
 
-let state = createGame(271828);
+const APP_VERSION = "0.1.12";
+const PROGRESS_STORAGE_KEY = "crystalFrontProgressV1";
+const AD_REWARD_RAYS = 40;
+const AD_COOLDOWN_MS = 60_000;
+
+const persistedProgress = loadPersistedProgress();
+let state = hydrateProgress(createGame(271828), persistedProgress);
 let isAnimating = false;
 let appView = "main";
 let hasStartedMatch = false;
@@ -22,6 +28,16 @@ const shopItems = [
   { bonus: Bonus.Mix, label: "Mix", detail: "Shuffles a local 5x5 area.", cost: 30 },
   { bonus: Bonus.Color, label: "Color", detail: "Clears one crystal color.", cost: 60 },
 ];
+
+const rayPacks = [
+  { id: "spark", label: "Spark Pack", rays: 250, price: "$1.99" },
+  { id: "beacon", label: "Beacon Pack", rays: 700, price: "$4.99" },
+  { id: "lighthouse", label: "Lighthouse Pack", rays: 1800, price: "$9.99" },
+];
+
+let shopState = {
+  lastAdClaimAt: persistedProgress?.shop?.lastAdClaimAt ?? 0,
+};
 
 const rivals = [
   { name: "North Prism", rating: 1380, record: "18-7" },
@@ -185,6 +201,8 @@ function handleMenuAction(action, sourceButton) {
   if (action === "leaderboard") openLeaderboardMenu();
   if (action === "settings") openSettingsMenu();
   if (action === "buy-bonus") buyBonus(sourceButton.dataset.bonus);
+  if (action === "claim-ad-reward") claimAdReward();
+  if (action === "iap-unavailable") showToast("IAP is disabled in this browser demo.");
   if (action === "setup-start") startNewMatch();
   if (action === "setup-back") closeSetupMenu();
   if (action === "resume") continueMatch();
@@ -212,6 +230,7 @@ async function commitAnimatedTurn(result) {
 
   state = result.state;
   persistLastMoves();
+  persistProgress();
   isAnimating = false;
   document.body.classList.remove("is-animating");
   if (state.winner) appView = "result";
@@ -312,7 +331,7 @@ function continueMatch() {
 }
 
 function startNewMatch() {
-  state = createGame(Date.now(), pendingSettings);
+  state = hydrateProgress(createGame(Date.now(), pendingSettings));
   hasStartedMatch = true;
   appView = "battle";
   render();
@@ -320,7 +339,7 @@ function startNewMatch() {
 
 function restartMatch() {
   if (isAnimating) return;
-  state = restart(state);
+  state = hydrateProgress(restart(state));
   hasStartedMatch = true;
   appView = "battle";
   render();
@@ -378,23 +397,84 @@ function renderSetupValues() {
 }
 
 function renderShop(snapshot) {
+  const now = Date.now();
+  const rewardReadyAt = shopState.lastAdClaimAt + AD_COOLDOWN_MS;
+  const rewardSeconds = Math.max(0, Math.ceil((rewardReadyAt - now) / 1000));
+  const rewardDisabled = rewardSeconds > 0;
+
   els.shopList.innerHTML = "";
+  const balance = document.createElement("section");
+  balance.className = "shop-section shop-balance";
+  balance.innerHTML = `
+    <div>
+      <span>BALANCE</span>
+      <strong>${snapshot.profile.rays}</strong>
+    </div>
+    <div>
+      <span>INVENTORY</span>
+      <strong>${Object.values(snapshot.bonuses).reduce((sum, value) => sum + value, 0)}</strong>
+    </div>
+  `;
+  els.shopList.append(balance);
+
+  const bonusSection = document.createElement("section");
+  bonusSection.className = "shop-section";
+  bonusSection.innerHTML = `<h3>Combat Bonuses</h3>`;
   for (const item of shopItems) {
     const row = document.createElement("div");
-    row.className = "item-row";
+    row.className = "item-row shop-item";
     row.innerHTML = `
       <div>
         <strong>${item.label}</strong>
         <span>${item.detail}</span>
       </div>
       <div class="item-buy">
-        <span>${snapshot.bonuses[item.bonus]}</span>
-        <button class="menu-button compact-button" data-action="buy-bonus" data-bonus="${item.bonus}" type="button">${item.cost}</button>
+        <span>Owned ${snapshot.bonuses[item.bonus]}</span>
+        <button class="menu-button compact-button" data-action="buy-bonus" data-bonus="${item.bonus}" type="button">${item.cost} Rays</button>
       </div>
     `;
     row.querySelector("button").disabled = snapshot.profile.rays < item.cost;
-    els.shopList.append(row);
+    bonusSection.append(row);
   }
+  els.shopList.append(bonusSection);
+
+  const rewardSection = document.createElement("section");
+  rewardSection.className = "shop-section";
+  rewardSection.innerHTML = `
+    <h3>Free Rays</h3>
+    <div class="item-row shop-item shop-reward">
+      <div>
+        <strong>Rewarded Ad</strong>
+        <span>${rewardDisabled ? `Ready in ${rewardSeconds}s` : "Test reward for the browser demo."}</span>
+      </div>
+      <div class="item-buy">
+        <span>+${AD_REWARD_RAYS}</span>
+        <button class="menu-button compact-button primary" data-action="claim-ad-reward" type="button">${rewardDisabled ? "Wait" : "Claim"}</button>
+      </div>
+    </div>
+  `;
+  rewardSection.querySelector("button").disabled = rewardDisabled;
+  els.shopList.append(rewardSection);
+
+  const packSection = document.createElement("section");
+  packSection.className = "shop-section";
+  packSection.innerHTML = `<h3>Ray Packs</h3>`;
+  for (const pack of rayPacks) {
+    const row = document.createElement("div");
+    row.className = "item-row shop-item shop-pack";
+    row.innerHTML = `
+      <div>
+        <strong>${pack.label}</strong>
+        <span>${pack.rays} Lighthouse Rays</span>
+      </div>
+      <div class="item-buy">
+        <span>${pack.price}</span>
+        <button class="menu-button compact-button" data-action="iap-unavailable" data-pack="${pack.id}" type="button">IAP</button>
+      </div>
+    `;
+    packSection.append(row);
+  }
+  els.shopList.append(packSection);
 }
 
 function renderLeaderboard(snapshot) {
@@ -462,7 +542,87 @@ function buyBonus(bonus) {
     },
     events: [{ type: "ShopPurchase", message: `${item.label} purchased.` }],
   };
+  persistProgress();
   render();
+}
+
+function claimAdReward() {
+  const now = Date.now();
+  if (now - shopState.lastAdClaimAt < AD_COOLDOWN_MS) {
+    const seconds = Math.ceil((shopState.lastAdClaimAt + AD_COOLDOWN_MS - now) / 1000);
+    showToast(`Reward ready in ${seconds}s.`);
+    return;
+  }
+
+  shopState = { ...shopState, lastAdClaimAt: now };
+  state = {
+    ...state,
+    profile: {
+      ...state.profile,
+      rays: state.profile.rays + AD_REWARD_RAYS,
+    },
+    events: [{ type: "ShopReward", message: `+${AD_REWARD_RAYS} Rays claimed.` }],
+  };
+  persistProgress();
+  render();
+}
+
+function hydrateProgress(gameState, progress = loadPersistedProgress()) {
+  if (!progress) return gameState;
+  return {
+    ...gameState,
+    profile: {
+      ...gameState.profile,
+      ...sanitizeProfile(progress.profile),
+    },
+    bonuses: {
+      ...gameState.bonuses,
+      ...sanitizeBonuses(progress.bonuses),
+    },
+  };
+}
+
+function sanitizeProfile(profile = {}) {
+  return {
+    rating: sanitizeNumber(profile.rating, 1200),
+    rays: sanitizeNumber(profile.rays, 260),
+  };
+}
+
+function sanitizeBonuses(bonuses = {}) {
+  return {
+    [Bonus.Bomb]: sanitizeNumber(bonuses[Bonus.Bomb], 3),
+    [Bonus.Line]: sanitizeNumber(bonuses[Bonus.Line], 3),
+    [Bonus.Mix]: sanitizeNumber(bonuses[Bonus.Mix], 2),
+    [Bonus.Color]: sanitizeNumber(bonuses[Bonus.Color], 2),
+  };
+}
+
+function sanitizeNumber(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? Math.floor(number) : fallback;
+}
+
+function loadPersistedProgress() {
+  try {
+    const raw = window.localStorage.getItem(PROGRESS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistProgress() {
+  try {
+    window.localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify({
+      version: APP_VERSION,
+      profile: state.profile,
+      bonuses: state.bonuses,
+      shop: shopState,
+    }));
+  } catch {
+    // Progress persistence is best-effort in private or restricted browser modes.
+  }
 }
 
 function clearPressedButtons() {
