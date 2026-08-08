@@ -4,13 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Crystal Front Demo</title>
-    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.19" />
+    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.20" />
   </head>
   <body>
     <main class="game-shell battle-shell" aria-label="Crystal Front demo">
       <section class="zone zone-hud" aria-label="Combat information">
         <div class="duelist duelist-player">
-          <span class="duelist-name">YOU</span>
+          <span id="playerName" class="duelist-name">YOU</span>
           <strong id="playerScore">0</strong>
           <span id="playerRating" class="micro-chip">Rating 1200</span>
         </div>
@@ -20,7 +20,7 @@
           <span id="turnOwner" class="micro-chip">Player move</span>
         </div>
         <div class="duelist duelist-rival">
-          <span class="duelist-name">RIVAL</span>
+          <span id="aiName" class="duelist-name">RIVAL</span>
           <strong id="aiScore">0</strong>
           <span id="aiDifficulty" class="micro-chip">AI 62</span>
         </div>
@@ -34,14 +34,11 @@
 
       <section class="zone zone-bonuses" aria-label="Bonuses">
         <div id="duelAssistPanel" class="duel-assist-panel" hidden>
-          <div class="duel-assist-side" aria-label="Duel assist side">
-            <button class="assist-toggle is-selected" data-assist-side="player" type="button">Help Blue</button>
-            <button class="assist-toggle" data-assist-side="ai" type="button">Help Red</button>
-          </div>
           <div class="duel-speed-control" aria-label="AI duel speed">
-            <button class="assist-step" data-duel-speed-step="-1" type="button">-</button>
+            <span>-2</span>
+            <input id="duelSpeedSlider" type="range" min="-2" max="2" step="1" value="0" />
             <strong id="duelSpeedValue">1x</strong>
-            <button class="assist-step" data-duel-speed-step="1" type="button">+</button>
+            <span>+2</span>
           </div>
         </div>
         <button class="bonus-card" data-bonus="bomb" type="button">
@@ -73,7 +70,7 @@
           <span>TARGET</span>
           <strong id="targetScore">50</strong>
         </div>
-        <div class="system-card info-card version" data-version-check>v0.1.19</div>
+        <div class="system-card info-card version" data-version-check>v0.1.20</div>
       </section>
 
       <div id="toast" class="toast" aria-live="polite"></div>
@@ -97,7 +94,7 @@
         <footer class="menu-footer">
           <span id="menuProfile">Rating 1200</span>
           <span id="menuRays">260 Rays</span>
-          <span data-version-check>v0.1.19</span>
+          <span data-version-check>v0.1.20</span>
         </footer>
       </div>
     </section>
@@ -109,7 +106,7 @@
           <h2>Duel Rules</h2>
         </header>
         <div class="control-stack">
-          <label class="control-row">
+          <label id="setupTargetRow" class="control-row">
             <span>
               AI Difficulty
               <strong id="setupAiValue">62</strong>
@@ -269,6 +266,6 @@
       </div>
     </section>
 
-    <script type="module" src="./src/presentation/browser/main.js?v=0.1.19"></script>
+    <script type="module" src="./src/presentation/browser/main.js?v=0.1.20"></script>
   </body>
 </html>

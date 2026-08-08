@@ -2,7 +2,7 @@ import { Bonus, Owner, Turn, VictoryMode } from "../../core/constants.js";
 import { createGame, getSnapshot, restart, runAiTurnWithTrace, runComputerTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
 import { MockRewardedAdProvider, RewardedAdStatus } from "./rewardedAds.js";
 
-const APP_VERSION = "0.1.19";
+const APP_VERSION = "0.1.20";
 const PROGRESS_STORAGE_KEY = "crystalFrontProgressV1";
 const AD_REWARD_RAYS = 40;
 const AD_COOLDOWN_MS = 60_000;
@@ -15,9 +15,7 @@ let appView = "main";
 let hasStartedMatch = false;
 let pendingSettings = { ...state.settings };
 let setupReturnView = "main";
-let duelAssistSide = Owner.Player;
-let duelSpeedIndex = 1;
-const duelSpeeds = [0.5, 1, 2, 4];
+let duelSpeedPower = 0;
 let uiPreferences = {
   sound: true,
   sfx: true,
@@ -65,6 +63,8 @@ const els = {
   aiScore: document.querySelector("#aiScore"),
   turnNumber: document.querySelector("#turnNumber"),
   turnOwner: document.querySelector("#turnOwner"),
+  playerName: document.querySelector("#playerName"),
+  aiName: document.querySelector("#aiName"),
   aiDifficulty: document.querySelector("#aiDifficulty"),
   playerRating: document.querySelector("#playerRating"),
   targetScore: document.querySelector("#targetScore"),
@@ -89,6 +89,7 @@ const els = {
   menuRays: document.querySelector("#menuRays"),
   setupAiDifficulty: document.querySelector("#setupAiDifficulty"),
   setupAiValue: document.querySelector("#setupAiValue"),
+  setupTargetRow: document.querySelector("#setupTargetRow"),
   setupTargetScore: document.querySelector("#setupTargetScore"),
   setupTargetValue: document.querySelector("#setupTargetValue"),
   victoryModeButtons: [...document.querySelectorAll("[data-victory-mode]")],
@@ -103,8 +104,7 @@ const els = {
   settingMotion: document.querySelector("#settingMotion"),
   settingMotionValue: document.querySelector("#settingMotionValue"),
   duelAssistPanel: document.querySelector("#duelAssistPanel"),
-  duelAssistButtons: [...document.querySelectorAll("[data-assist-side]")],
-  duelSpeedButtons: [...document.querySelectorAll("[data-duel-speed-step]")],
+  duelSpeedSlider: document.querySelector("#duelSpeedSlider"),
   duelSpeedValue: document.querySelector("#duelSpeedValue"),
   resultTitle: document.querySelector("#resultTitle"),
   resultPlayerScore: document.querySelector("#resultPlayerScore"),
@@ -125,7 +125,7 @@ els.board.addEventListener("click", async (event) => {
   };
 
   if (state.selectedBonus && (state.turn === Turn.Player || state.settings.victoryMode === VictoryMode.AiDuel)) {
-    const actor = state.settings.victoryMode === VictoryMode.AiDuel ? duelAssistSide : Owner.Player;
+    const actor = state.settings.victoryMode === VictoryMode.AiDuel && state.turn === Turn.AI ? Owner.AI : Owner.Player;
     await commitAnimatedTurn(submitBonusTurn(state, state.selectedBonus, position, actor));
     if (state.settings.victoryMode === VictoryMode.AiDuel) {
       await maybeRunAiDuel();
@@ -246,18 +246,9 @@ els.victoryModeButtons.forEach((button) => {
   });
 });
 
-els.duelAssistButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    duelAssistSide = button.dataset.assistSide === Owner.AI ? Owner.AI : Owner.Player;
-    renderDuelAssist();
-  });
-});
-
-els.duelSpeedButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    duelSpeedIndex = Math.max(0, Math.min(duelSpeeds.length - 1, duelSpeedIndex + Number(button.dataset.duelSpeedStep)));
-    renderDuelAssist();
-  });
+els.duelSpeedSlider.addEventListener("input", () => {
+  duelSpeedPower = Number(els.duelSpeedSlider.value);
+  renderDuelAssist();
 });
 
 els.settingSound.addEventListener("change", () => updatePreference("sound", els.settingSound.checked));
@@ -329,8 +320,10 @@ function render(snapshot = getSnapshot(state), phase = null) {
   els.aiScore.textContent = snapshot.scores.ai;
   els.turnNumber.textContent = snapshot.turnNumber;
   els.turnOwner.textContent = formatTurn(snapshot);
+  els.playerName.textContent = snapshot.settings.victoryMode === VictoryMode.AiDuel ? "BLUE AI" : "YOU";
+  els.aiName.textContent = snapshot.settings.victoryMode === VictoryMode.AiDuel ? "RED AI" : "RIVAL";
   els.aiDifficulty.textContent = `AI ${snapshot.settings.aiDifficulty}`;
-  els.playerRating.textContent = `Rating ${snapshot.profile.rating}`;
+  els.playerRating.textContent = snapshot.settings.victoryMode === VictoryMode.AiDuel ? `AI ${snapshot.settings.aiDifficulty}` : `Rating ${snapshot.profile.rating}`;
   els.targetScore.textContent = snapshot.settings.victoryMode === VictoryMode.TargetScore
     ? snapshot.settings.targetScore
     : snapshot.settings.victoryMode === VictoryMode.LastMove
@@ -483,7 +476,7 @@ function renderSetupValues() {
   els.setupAiValue.textContent = pendingSettings.aiDifficulty;
   els.setupTargetScore.value = String(pendingSettings.targetScore);
   els.setupTargetValue.textContent = pendingSettings.targetScore;
-  els.setupTargetScore.disabled = pendingSettings.victoryMode !== VictoryMode.TargetScore;
+  els.setupTargetRow.hidden = pendingSettings.victoryMode !== VictoryMode.TargetScore;
   els.victoryModeButtons.forEach((button) => {
     button.classList.toggle("is-selected", button.dataset.victoryMode === pendingSettings.victoryMode);
   });
@@ -602,19 +595,17 @@ function renderSettings() {
 function renderDuelAssist(snapshot = getSnapshot(state)) {
   const isAiDuel = snapshot.settings.victoryMode === VictoryMode.AiDuel && appView === "battle";
   els.duelAssistPanel.hidden = !isAiDuel;
-  els.duelSpeedValue.textContent = `${getDuelSpeed()}x`;
-  els.duelAssistButtons.forEach((button) => {
-    button.classList.toggle("is-selected", button.dataset.assistSide === duelAssistSide);
-  });
-  els.duelSpeedButtons.forEach((button) => {
-    const nextIndex = duelSpeedIndex + Number(button.dataset.duelSpeedStep);
-    button.disabled = nextIndex < 0 || nextIndex >= duelSpeeds.length;
-  });
+  els.duelSpeedValue.textContent = `${formatSpeed(getDuelSpeed())}x`;
+  els.duelSpeedSlider.value = String(duelSpeedPower);
   document.body.classList.toggle("is-ai-duel", isAiDuel);
 }
 
 function getDuelSpeed() {
-  return duelSpeeds[duelSpeedIndex] ?? 1;
+  return 2 ** duelSpeedPower;
+}
+
+function formatSpeed(speed) {
+  return Number.isInteger(speed) ? String(speed) : String(speed);
 }
 
 function getDuelAnimationSpeed() {

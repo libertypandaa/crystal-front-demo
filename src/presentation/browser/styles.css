@@ -654,8 +654,7 @@ body.is-ai-duel .zone-bonuses {
 .duel-assist-panel {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: minmax(0, 1fr) minmax(98px, 0.48fr);
-  gap: 8px;
+  grid-template-columns: 1fr;
   min-height: 34px;
 }
 
@@ -663,22 +662,14 @@ body.is-ai-duel .zone-bonuses {
   display: none;
 }
 
-.duel-assist-side,
 .duel-speed-control {
   display: grid;
-  gap: 5px;
+  grid-template-columns: 26px minmax(0, 1fr) 48px 26px;
+  gap: 7px;
+  align-items: center;
 }
 
-.duel-assist-side {
-  grid-template-columns: repeat(2, 1fr);
-}
-
-.duel-speed-control {
-  grid-template-columns: 30px 1fr 30px;
-}
-
-.assist-toggle,
-.assist-step,
+.duel-speed-control span,
 .duel-speed-control strong {
   display: grid;
   min-width: 0;
@@ -692,26 +683,13 @@ body.is-ai-duel .zone-bonuses {
   font-weight: 800;
 }
 
-.assist-toggle.is-selected[data-assist-side="player"] {
-  border-color: rgba(57, 217, 255, 0.76);
-  color: var(--text-primary);
-  background: rgba(25, 170, 245, 0.2);
-  box-shadow: 0 0 16px rgba(25, 170, 245, 0.22);
-}
-
-.assist-toggle.is-selected[data-assist-side="ai"] {
-  border-color: rgba(246, 76, 115, 0.76);
-  color: var(--text-primary);
-  background: rgba(246, 76, 115, 0.18);
-  box-shadow: 0 0 16px rgba(246, 76, 115, 0.2);
-}
-
 .duel-speed-control strong {
   color: var(--gold);
 }
 
-.assist-step:disabled {
-  opacity: 0.42;
+.duel-speed-control input[type="range"] {
+  width: 100%;
+  accent-color: var(--gold);
 }
 
 body.is-ai-duel .bonus-card {
