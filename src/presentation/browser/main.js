@@ -1,7 +1,7 @@
 import { Bonus, Owner, Turn } from "../../core/constants.js";
 import { createGame, getSnapshot, restart, runAiTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
 
-const APP_VERSION = "0.1.13";
+const APP_VERSION = "0.1.14";
 const PROGRESS_STORAGE_KEY = "crystalFrontProgressV1";
 const AD_REWARD_RAYS = 40;
 const AD_COOLDOWN_MS = 60_000;
@@ -163,7 +163,12 @@ document.addEventListener("click", (event) => {
 document.addEventListener("pointerdown", (event) => {
   const button = event.target.closest("button");
   if (!button || button.disabled) return;
+  updateButtonPointer(button, event);
   button.classList.add("is-pressed");
+  if (button.classList.contains("menu-button")) {
+    button.classList.remove("is-rippling");
+    requestAnimationFrame(() => button.classList.add("is-rippling"));
+  }
 });
 
 document.addEventListener("pointerup", clearPressedButtons);
@@ -172,7 +177,10 @@ document.addEventListener("pointercancel", clearPressedButtons);
 document.addEventListener("pointermove", (event) => {
   document.querySelectorAll("button.is-touch-hover").forEach((button) => button.classList.remove("is-touch-hover"));
   const button = document.elementFromPoint(event.clientX, event.clientY)?.closest("button");
-  if (button && !button.disabled) button.classList.add("is-touch-hover");
+  if (button && !button.disabled) {
+    updateButtonPointer(button, event);
+    button.classList.add("is-touch-hover");
+  }
 });
 
 els.setupAiDifficulty.addEventListener("input", () => {
@@ -635,6 +643,14 @@ function clearPressedButtons() {
   document.querySelectorAll("button.is-pressed, button.is-touch-hover").forEach((button) => {
     button.classList.remove("is-pressed", "is-touch-hover");
   });
+}
+
+function updateButtonPointer(button, event) {
+  const rect = button.getBoundingClientRect();
+  const x = ((event.clientX - rect.left) / rect.width) * 100;
+  const y = ((event.clientY - rect.top) / rect.height) * 100;
+  button.style.setProperty("--press-x", `${Math.max(0, Math.min(100, x))}%`);
+  button.style.setProperty("--press-y", `${Math.max(0, Math.min(100, y))}%`);
 }
 
 function formatTurn(snapshot) {
