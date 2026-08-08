@@ -1,7 +1,7 @@
 import { Bonus, Owner, Turn } from "../../core/constants.js";
 import { createGame, getSnapshot, restart, runAiTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
 
-const APP_VERSION = "0.1.14";
+const APP_VERSION = "0.1.15";
 const PROGRESS_STORAGE_KEY = "crystalFrontProgressV1";
 const AD_REWARD_RAYS = 40;
 const AD_COOLDOWN_MS = 60_000;
@@ -167,12 +167,21 @@ document.addEventListener("pointerdown", (event) => {
   button.classList.add("is-pressed");
   if (button.classList.contains("menu-button")) {
     button.classList.remove("is-rippling");
-    requestAnimationFrame(() => button.classList.add("is-rippling"));
+    window.cancelAnimationFrame(button.rippleFrame);
+    button.rippleFrame = requestAnimationFrame(() => {
+      if (button.classList.contains("is-pressed")) button.classList.add("is-rippling");
+    });
   }
 });
 
 document.addEventListener("pointerup", clearPressedButtons);
 document.addEventListener("pointercancel", clearPressedButtons);
+
+document.addEventListener("animationend", (event) => {
+  if (event.animationName === "menu-button-ripple" && event.target.classList.contains("menu-button")) {
+    event.target.classList.remove("is-rippling");
+  }
+});
 
 document.addEventListener("pointermove", (event) => {
   document.querySelectorAll("button.is-touch-hover").forEach((button) => button.classList.remove("is-touch-hover"));
@@ -208,6 +217,7 @@ document.querySelectorAll("[data-setting]").forEach((button) => {
 });
 
 function handleMenuAction(action, sourceButton) {
+  clearButtonFeedback({ includeRipple: true });
   if (action === "start") startNewMatch();
   if (action === "continue") continueMatch();
   if (action === "setup") openSetupMenu();
@@ -640,8 +650,21 @@ function persistProgress() {
 }
 
 function clearPressedButtons() {
-  document.querySelectorAll("button.is-pressed, button.is-touch-hover").forEach((button) => {
+  clearButtonFeedback();
+}
+
+function clearButtonFeedback({ includeRipple = false } = {}) {
+  const selector = includeRipple
+    ? "button"
+    : "button.is-pressed, button.is-touch-hover";
+  document.querySelectorAll(selector).forEach((button) => {
+    window.cancelAnimationFrame(button.rippleFrame);
     button.classList.remove("is-pressed", "is-touch-hover");
+    if (includeRipple) {
+      button.classList.remove("is-rippling");
+      button.style.removeProperty("--press-x");
+      button.style.removeProperty("--press-y");
+    }
   });
 }
 
