@@ -1,7 +1,8 @@
 import { Bonus, Owner, Turn } from "../../core/constants.js";
 import { createGame, getSnapshot, restart, runAiTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
+import { MockRewardedAdProvider, RewardedAdStatus } from "./rewardedAds.js";
 
-const APP_VERSION = "0.1.16";
+const APP_VERSION = "0.1.17";
 const PROGRESS_STORAGE_KEY = "crystalFrontProgressV1";
 const AD_REWARD_RAYS = 40;
 const AD_COOLDOWN_MS = 60_000;
@@ -9,6 +10,7 @@ const AD_COOLDOWN_MS = 60_000;
 const persistedProgress = loadPersistedProgress();
 let state = hydrateProgress(createGame(271828), persistedProgress);
 let isAnimating = false;
+let isClaimingAdReward = false;
 let appView = "main";
 let hasStartedMatch = false;
 let pendingSettings = { ...state.settings };
@@ -36,6 +38,7 @@ const rayPacks = [
 let shopState = {
   lastAdClaimAt: persistedProgress?.shop?.lastAdClaimAt ?? 0,
 };
+const rewardedAds = new MockRewardedAdProvider();
 
 const rivals = [
   { name: "North Prism", rating: 1380, record: "18-7" },
@@ -418,7 +421,7 @@ function renderShop(snapshot) {
   const now = Date.now();
   const rewardReadyAt = shopState.lastAdClaimAt + AD_COOLDOWN_MS;
   const rewardSeconds = Math.max(0, Math.ceil((rewardReadyAt - now) / 1000));
-  const rewardDisabled = rewardSeconds > 0;
+  const rewardDisabled = rewardSeconds > 0 || isClaimingAdReward;
 
   els.shopList.innerHTML = "";
   const balance = document.createElement("section");
@@ -463,11 +466,11 @@ function renderShop(snapshot) {
     <div class="item-row shop-item shop-reward">
       <div>
         <strong>Rewarded Ad</strong>
-        <span>${rewardDisabled ? `Ready in ${rewardSeconds}s` : "Test reward for the browser demo."}</span>
+        <span>${isClaimingAdReward ? "Showing test ad..." : rewardSeconds > 0 ? `Ready in ${rewardSeconds}s` : "Test reward for the browser demo."}</span>
       </div>
       <div class="item-buy">
         <span>+${AD_REWARD_RAYS}</span>
-        <button class="menu-button compact-button primary" data-action="claim-ad-reward" type="button">${rewardDisabled ? "Wait" : "Claim"}</button>
+        <button class="menu-button compact-button primary" data-action="claim-ad-reward" type="button">${isClaimingAdReward ? "..." : rewardSeconds > 0 ? "Wait" : "Claim"}</button>
       </div>
     </div>
   `;
@@ -561,11 +564,23 @@ function buyBonus(bonus) {
   render();
 }
 
-function claimAdReward() {
+async function claimAdReward() {
+  if (isClaimingAdReward) return;
   const now = Date.now();
   if (now - shopState.lastAdClaimAt < AD_COOLDOWN_MS) {
     const seconds = Math.ceil((shopState.lastAdClaimAt + AD_COOLDOWN_MS - now) / 1000);
     showToast(`Reward ready in ${seconds}s.`);
+    return;
+  }
+
+  showToast("Showing rewarded ad...");
+  isClaimingAdReward = true;
+  render();
+  const result = await rewardedAds.show();
+  isClaimingAdReward = false;
+  if (result.status !== RewardedAdStatus.Rewarded) {
+    showToast(result.message || "Rewarded ad is unavailable.");
+    render();
     return;
   }
 
@@ -576,7 +591,7 @@ function claimAdReward() {
       ...state.profile,
       rays: state.profile.rays + AD_REWARD_RAYS,
     },
-    events: [{ type: "ShopReward", message: `+${AD_REWARD_RAYS} Rays claimed.` }],
+    events: [{ type: "ShopReward", message: `+${AD_REWARD_RAYS} Rays claimed via ${result.provider}.` }],
   };
   persistProgress();
   render();
