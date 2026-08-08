@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Crystal Front Demo</title>
-    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.15" />
+    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.16" />
   </head>
   <body>
     <main class="game-shell battle-shell" aria-label="Crystal Front demo">
@@ -62,7 +62,7 @@
           <span>TARGET</span>
           <strong id="targetScore">50</strong>
         </div>
-        <div class="system-card info-card version" data-version-check>v0.1.15</div>
+        <div class="system-card info-card version" data-version-check>v0.1.16</div>
       </section>
 
       <div id="toast" class="toast" aria-live="polite"></div>
@@ -86,7 +86,7 @@
         <footer class="menu-footer">
           <span id="menuProfile">Rating 1200</span>
           <span id="menuRays">260 Rays</span>
-          <span data-version-check>v0.1.15</span>
+          <span data-version-check>v0.1.16</span>
         </footer>
       </div>
     </section>
@@ -191,16 +191,6 @@
             </span>
             <input id="settingMotion" type="range" min="0" max="100" step="10" value="100" />
           </label>
-          <div class="segmented-row" aria-label="Orientation">
-            <button class="segment is-selected" data-setting="orientation" data-value="auto" type="button">Auto</button>
-            <button class="segment" data-setting="orientation" data-value="portrait" type="button">Portrait</button>
-            <button class="segment" data-setting="orientation" data-value="landscape" type="button">Land</button>
-          </div>
-          <div class="segmented-row" aria-label="Palette">
-            <button class="segment is-selected" data-setting="palette" data-value="classic" type="button">Classic</button>
-            <button class="segment" data-setting="palette" data-value="pastel" type="button">Pastel</button>
-            <button class="segment" data-setting="palette" data-value="mint" type="button">Mint</button>
-          </div>
         </div>
         <div class="menu-actions compact">
           <button class="menu-button primary" data-action="settings-apply" type="button">Apply</button>
@@ -268,6 +258,6 @@
       </div>
     </section>
 
-    <script type="module" src="./src/presentation/browser/main.js?v=0.1.15"></script>
+    <script type="module" src="./src/presentation/browser/main.js?v=0.1.16"></script>
   </body>
 </html>

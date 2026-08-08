@@ -1,7 +1,7 @@
 import { Bonus, Owner, Turn } from "../../core/constants.js";
 import { createGame, getSnapshot, restart, runAiTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
 
-const APP_VERSION = "0.1.15";
+const APP_VERSION = "0.1.16";
 const PROGRESS_STORAGE_KEY = "crystalFrontProgressV1";
 const AD_REWARD_RAYS = 40;
 const AD_COOLDOWN_MS = 60_000;
@@ -18,8 +18,6 @@ let uiPreferences = {
   sfx: true,
   animations: true,
   motion: 100,
-  orientation: "auto",
-  palette: "classic",
 };
 
 const shopItems = [
@@ -211,10 +209,6 @@ els.settingSound.addEventListener("change", () => updatePreference("sound", els.
 els.settingSfx.addEventListener("change", () => updatePreference("sfx", els.settingSfx.checked));
 els.settingAnimations.addEventListener("change", () => updatePreference("animations", els.settingAnimations.checked));
 els.settingMotion.addEventListener("input", () => updatePreference("motion", Number(els.settingMotion.value)));
-
-document.querySelectorAll("[data-setting]").forEach((button) => {
-  button.addEventListener("click", () => updatePreference(button.dataset.setting, button.dataset.value));
-});
 
 function handleMenuAction(action, sourceButton) {
   clearButtonFeedback({ includeRipple: true });
@@ -531,9 +525,6 @@ function renderSettings() {
   els.settingAnimations.checked = uiPreferences.animations;
   els.settingMotion.value = String(uiPreferences.motion);
   els.settingMotionValue.textContent = `${uiPreferences.motion}%`;
-  document.querySelectorAll("[data-setting]").forEach((button) => {
-    button.classList.toggle("is-selected", uiPreferences[button.dataset.setting] === button.dataset.value);
-  });
   document.body.classList.toggle("reduce-ui-motion", !uiPreferences.animations || uiPreferences.motion === 0);
 }
 
