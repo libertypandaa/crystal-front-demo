@@ -130,8 +130,8 @@ export function submitSwapTurn(state, from, to, actor, options = {}) {
   return applySwapCommandWithTrace(state, from, to, actor, options);
 }
 
-export function submitBonusTurn(state, bonus, position) {
-  return useBonusWithTrace(state, bonus, position);
+export function submitBonusTurn(state, bonus, position, actor = Owner.Player) {
+  return useBonusWithTrace(state, bonus, position, actor);
 }
 
 function applySwapCommand(state, from, to, actor) {
@@ -277,8 +277,8 @@ function resolveTurnWithTrace(state, actor, incomingEvents, incomingTrace = [], 
   };
 }
 
-function useBonusWithTrace(state, bonus, position) {
-  if (bonus === Bonus.Mix) return useMixBonusWithTrace(state, position);
+function useBonusWithTrace(state, bonus, position, actor = Owner.Player) {
+  if (bonus === Bonus.Mix) return useMixBonusWithTrace(state, position, actor);
 
   const targets = getBonusTargets(state.cells, bonus, position);
   if (targets.length === 0) return { state, trace: [] };
@@ -286,7 +286,7 @@ function useBonusWithTrace(state, bonus, position) {
   const bonuses = { ...state.bonuses, [bonus]: state.bonuses[bonus] - 1 };
   const trace = [{
     type: "bonus",
-    actor: Owner.Player,
+    actor,
     bonus,
     targetIds: targets.map((cell) => cell.id),
     cells: cloneCells(state.cells),
@@ -299,10 +299,10 @@ function useBonusWithTrace(state, bonus, position) {
     bonuses,
     selected: null,
     selectedBonus: null,
-  }, Owner.Player, [{ type: "BonusUsed", message: `${bonus.toUpperCase()} cleared ${targets.length} cells.` }], trace, {}, targets);
+  }, actor, [{ type: "BonusUsed", message: `${bonus.toUpperCase()} cleared ${targets.length} cells.` }], trace, {}, targets);
 }
 
-function useMixBonusWithTrace(state, position) {
+function useMixBonusWithTrace(state, position, actor = Owner.Player) {
   const targets = getMixTargets(state.cells, position);
   if (targets.length === 0) return { state, trace: [] };
 
@@ -330,11 +330,11 @@ function useMixBonusWithTrace(state, position) {
     bonuses,
     selected: null,
     selectedBonus: null,
-  }, Owner.Player, [{ type: "BonusUsed", message: `MIX changed ${targets.length} crystals.` }], [{
+  }, actor, [{ type: "BonusUsed", message: `MIX changed ${targets.length} crystals.` }], [{
     type: "mix",
-    actor: Owner.Player,
+    actor,
     bonus: Bonus.Mix,
-    movableOwner: getMovableOwner(Owner.Player),
+    movableOwner: getMovableOwner(actor),
     changedIds: targets.map((cell) => cell.id),
     cells: cloneCells(cells),
     message: "MIX reshuffled the local field.",

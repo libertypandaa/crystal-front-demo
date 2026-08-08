@@ -2,7 +2,7 @@ import { Bonus, Owner, Turn, VictoryMode } from "../../core/constants.js";
 import { createGame, getSnapshot, restart, runAiTurnWithTrace, runComputerTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
 import { MockRewardedAdProvider, RewardedAdStatus } from "./rewardedAds.js";
 
-const APP_VERSION = "0.1.18";
+const APP_VERSION = "0.1.19";
 const PROGRESS_STORAGE_KEY = "crystalFrontProgressV1";
 const AD_REWARD_RAYS = 40;
 const AD_COOLDOWN_MS = 60_000;
@@ -15,6 +15,9 @@ let appView = "main";
 let hasStartedMatch = false;
 let pendingSettings = { ...state.settings };
 let setupReturnView = "main";
+let duelAssistSide = Owner.Player;
+let duelSpeedIndex = 1;
+const duelSpeeds = [0.5, 1, 2, 4];
 let uiPreferences = {
   sound: true,
   sfx: true,
@@ -99,6 +102,10 @@ const els = {
   settingAnimations: document.querySelector("#settingAnimations"),
   settingMotion: document.querySelector("#settingMotion"),
   settingMotionValue: document.querySelector("#settingMotionValue"),
+  duelAssistPanel: document.querySelector("#duelAssistPanel"),
+  duelAssistButtons: [...document.querySelectorAll("[data-assist-side]")],
+  duelSpeedButtons: [...document.querySelectorAll("[data-duel-speed-step]")],
+  duelSpeedValue: document.querySelector("#duelSpeedValue"),
   resultTitle: document.querySelector("#resultTitle"),
   resultPlayerScore: document.querySelector("#resultPlayerScore"),
   resultAiScore: document.querySelector("#resultAiScore"),
@@ -110,7 +117,6 @@ render();
 
 els.board.addEventListener("click", async (event) => {
   if (isAnimating || appView !== "battle") return;
-  if (state.settings.victoryMode === VictoryMode.AiDuel) return;
   const cell = event.target.closest("[data-row]");
   if (!cell) return;
   const position = {
@@ -118,11 +124,18 @@ els.board.addEventListener("click", async (event) => {
     col: Number(cell.dataset.col),
   };
 
-  if (state.selectedBonus && state.turn === Turn.Player) {
-    await commitAnimatedTurn(submitBonusTurn(state, state.selectedBonus, position));
-    await maybeRunAi();
+  if (state.selectedBonus && (state.turn === Turn.Player || state.settings.victoryMode === VictoryMode.AiDuel)) {
+    const actor = state.settings.victoryMode === VictoryMode.AiDuel ? duelAssistSide : Owner.Player;
+    await commitAnimatedTurn(submitBonusTurn(state, state.selectedBonus, position, actor));
+    if (state.settings.victoryMode === VictoryMode.AiDuel) {
+      await maybeRunAiDuel();
+    } else {
+      await maybeRunAi();
+    }
     return;
   }
+
+  if (state.settings.victoryMode === VictoryMode.AiDuel) return;
 
   if (state.selected && isAdjacent(state.selected, position) && state.turn === Turn.Player && !state.selectedBonus) {
     await commitAnimatedTurn(submitSwapTurn(state, state.selected, position, Owner.Player));
@@ -138,7 +151,20 @@ els.board.addEventListener("click", async (event) => {
 document.querySelectorAll("[data-bonus]").forEach((button) => {
   button.addEventListener("click", () => {
     if (isAnimating || appView !== "battle") return;
-    state = selectBonus(state, button.dataset.bonus);
+    if (state.settings.victoryMode === VictoryMode.AiDuel) {
+      const bonus = button.dataset.bonus;
+      if (state.bonuses[bonus] <= 0) {
+        showToast("No bonus charges left.");
+        return;
+      }
+      state = {
+        ...state,
+        selected: null,
+        selectedBonus: state.selectedBonus === bonus ? null : bonus,
+      };
+    } else {
+      state = selectBonus(state, button.dataset.bonus);
+    }
     render();
   });
 });
@@ -220,6 +246,20 @@ els.victoryModeButtons.forEach((button) => {
   });
 });
 
+els.duelAssistButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    duelAssistSide = button.dataset.assistSide === Owner.AI ? Owner.AI : Owner.Player;
+    renderDuelAssist();
+  });
+});
+
+els.duelSpeedButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    duelSpeedIndex = Math.max(0, Math.min(duelSpeeds.length - 1, duelSpeedIndex + Number(button.dataset.duelSpeedStep)));
+    renderDuelAssist();
+  });
+});
+
 els.settingSound.addEventListener("change", () => updatePreference("sound", els.settingSound.checked));
 els.settingSfx.addEventListener("change", () => updatePreference("sfx", els.settingSfx.checked));
 els.settingAnimations.addEventListener("change", () => updatePreference("animations", els.settingAnimations.checked));
@@ -253,9 +293,9 @@ async function maybeRunAi() {
 }
 
 async function maybeRunAiDuel() {
-  if (appView !== "battle" || state.winner || state.settings.victoryMode !== VictoryMode.AiDuel || state.turn === Turn.Ended || isAnimating) return;
-  await wait(620);
-  if (appView !== "battle" || state.winner || state.settings.victoryMode !== VictoryMode.AiDuel || isAnimating) return;
+  if (appView !== "battle" || state.winner || state.settings.victoryMode !== VictoryMode.AiDuel || state.turn === Turn.Ended || isAnimating || state.selectedBonus) return;
+  await wait(620 / getDuelSpeed());
+  if (appView !== "battle" || state.winner || state.settings.victoryMode !== VictoryMode.AiDuel || isAnimating || state.selectedBonus) return;
   await commitAnimatedTurn(runComputerTurnWithTrace(state, state.turn === Turn.Player ? Owner.Player : Owner.AI));
   await maybeRunAiDuel();
 }
@@ -266,7 +306,7 @@ async function commitAnimatedTurn(result) {
 
   for (const phase of result.trace) {
     if (phase.cells) render(makeSnapshot(phase.cells), phase);
-    await wait(getPhaseDuration(phase));
+    await wait(getPhaseDuration(phase) / getDuelAnimationSpeed());
   }
 
   state = result.state;
@@ -302,7 +342,7 @@ function render(snapshot = getSnapshot(state), phase = null) {
     const button = document.querySelector(`[data-bonus="${bonus}"]`);
     count.textContent = snapshot.bonuses[bonus];
     button.classList.toggle("is-selected", snapshot.selectedBonus === bonus);
-    button.disabled = snapshot.bonuses[bonus] <= 0 || snapshot.turn !== Turn.Player || snapshot.winner || isAnimating || appView !== "battle" || snapshot.settings.victoryMode === VictoryMode.AiDuel;
+    button.disabled = snapshot.bonuses[bonus] <= 0 || snapshot.winner || isAnimating || appView !== "battle" || (snapshot.turn !== Turn.Player && snapshot.settings.victoryMode !== VictoryMode.AiDuel);
   }
 
   els.board.innerHTML = "";
@@ -351,6 +391,7 @@ function updateScreens(snapshot) {
   renderShop(snapshot);
   renderLeaderboard(snapshot);
   renderSettings();
+  renderDuelAssist(snapshot);
   updateResult(snapshot);
 }
 
@@ -556,6 +597,28 @@ function renderSettings() {
   els.settingMotion.value = String(uiPreferences.motion);
   els.settingMotionValue.textContent = `${uiPreferences.motion}%`;
   document.body.classList.toggle("reduce-ui-motion", !uiPreferences.animations || uiPreferences.motion === 0);
+}
+
+function renderDuelAssist(snapshot = getSnapshot(state)) {
+  const isAiDuel = snapshot.settings.victoryMode === VictoryMode.AiDuel && appView === "battle";
+  els.duelAssistPanel.hidden = !isAiDuel;
+  els.duelSpeedValue.textContent = `${getDuelSpeed()}x`;
+  els.duelAssistButtons.forEach((button) => {
+    button.classList.toggle("is-selected", button.dataset.assistSide === duelAssistSide);
+  });
+  els.duelSpeedButtons.forEach((button) => {
+    const nextIndex = duelSpeedIndex + Number(button.dataset.duelSpeedStep);
+    button.disabled = nextIndex < 0 || nextIndex >= duelSpeeds.length;
+  });
+  document.body.classList.toggle("is-ai-duel", isAiDuel);
+}
+
+function getDuelSpeed() {
+  return duelSpeeds[duelSpeedIndex] ?? 1;
+}
+
+function getDuelAnimationSpeed() {
+  return state.settings.victoryMode === VictoryMode.AiDuel ? getDuelSpeed() : 1;
 }
 
 function updatePreference(key, value) {

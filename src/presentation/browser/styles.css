@@ -647,6 +647,82 @@ button:focus-visible {
   gap: var(--gap);
 }
 
+body.is-ai-duel .zone-bonuses {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.duel-assist-panel {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) minmax(98px, 0.48fr);
+  gap: 8px;
+  min-height: 34px;
+}
+
+.duel-assist-panel[hidden] {
+  display: none;
+}
+
+.duel-assist-side,
+.duel-speed-control {
+  display: grid;
+  gap: 5px;
+}
+
+.duel-assist-side {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.duel-speed-control {
+  grid-template-columns: 30px 1fr 30px;
+}
+
+.assist-toggle,
+.assist-step,
+.duel-speed-control strong {
+  display: grid;
+  min-width: 0;
+  min-height: 34px;
+  place-items: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-button);
+  background: rgba(4, 9, 18, 0.78);
+  color: var(--text-secondary);
+  font-size: clamp(0.62rem, 2.2vw, 0.78rem);
+  font-weight: 800;
+}
+
+.assist-toggle.is-selected[data-assist-side="player"] {
+  border-color: rgba(57, 217, 255, 0.76);
+  color: var(--text-primary);
+  background: rgba(25, 170, 245, 0.2);
+  box-shadow: 0 0 16px rgba(25, 170, 245, 0.22);
+}
+
+.assist-toggle.is-selected[data-assist-side="ai"] {
+  border-color: rgba(246, 76, 115, 0.76);
+  color: var(--text-primary);
+  background: rgba(246, 76, 115, 0.18);
+  box-shadow: 0 0 16px rgba(246, 76, 115, 0.2);
+}
+
+.duel-speed-control strong {
+  color: var(--gold);
+}
+
+.assist-step:disabled {
+  opacity: 0.42;
+}
+
+body.is-ai-duel .bonus-card {
+  min-height: 0;
+  padding-block: clamp(4px, 0.7svh, 8px);
+}
+
+body.is-ai-duel .bonus-icon {
+  width: min(11vw, 48px);
+}
+
 .bonus-card {
   position: relative;
   display: flex;
