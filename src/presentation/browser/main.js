@@ -1,7 +1,7 @@
 import { Bonus, Owner, Turn } from "../../core/constants.js";
 import { createGame, getSnapshot, restart, runAiTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
 
-const APP_VERSION = "0.1.12";
+const APP_VERSION = "0.1.13";
 const PROGRESS_STORAGE_KEY = "crystalFrontProgressV1";
 const AD_REWARD_RAYS = 40;
 const AD_COOLDOWN_MS = 60_000;
@@ -149,6 +149,12 @@ els.menuButton.addEventListener("click", () => {
 });
 
 document.addEventListener("click", (event) => {
+  const versionLabel = event.target.closest("[data-version-check]");
+  if (versionLabel) {
+    checkForLatestVersion();
+    return;
+  }
+
   const actionButton = event.target.closest("[data-action]");
   if (!actionButton || actionButton.disabled) return;
   handleMenuAction(actionButton.dataset.action, actionButton);
@@ -643,6 +649,63 @@ function showToast(message) {
   els.toast.classList.add("is-visible");
   window.clearTimeout(showToast.timer);
   showToast.timer = window.setTimeout(() => els.toast.classList.remove("is-visible"), 1800);
+}
+
+async function checkForLatestVersion() {
+  showToast("Checking version...");
+  try {
+    const latestVersion = await fetchLatestVersion();
+    if (!latestVersion) {
+      showToast("Could not read latest version.");
+      return;
+    }
+
+    if (compareVersions(latestVersion, APP_VERSION) <= 0) {
+      showToast(`Latest version: v${APP_VERSION}.`);
+      return;
+    }
+
+    showToast(`Updating to v${latestVersion}...`);
+    window.setTimeout(() => reloadWithVersion(latestVersion), 420);
+  } catch {
+    showToast("Version check failed.");
+  }
+}
+
+async function fetchLatestVersion() {
+  const checkUrl = new URL("./index.html", window.location.href);
+  checkUrl.searchParams.set("cache-check", String(Date.now()));
+  const response = await fetch(checkUrl.href, {
+    cache: "no-store",
+    headers: { "Cache-Control": "no-cache" },
+  });
+  if (!response.ok) return null;
+  const html = await response.text();
+  return readLatestVersionFromHtml(html);
+}
+
+function readLatestVersionFromHtml(html) {
+  const assetVersion = html.match(/main\.js\?v=([0-9]+(?:\.[0-9]+){1,3})/i)?.[1];
+  const labelVersion = html.match(/v([0-9]+(?:\.[0-9]+){1,3})/)?.[1];
+  return assetVersion ?? labelVersion ?? null;
+}
+
+function reloadWithVersion(version) {
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.set("v", version);
+  nextUrl.searchParams.set("refresh", String(Date.now()));
+  window.location.replace(nextUrl.href);
+}
+
+function compareVersions(left, right) {
+  const leftParts = String(left).split(".").map((part) => Number(part));
+  const rightParts = String(right).split(".").map((part) => Number(part));
+  const length = Math.max(leftParts.length, rightParts.length);
+  for (let index = 0; index < length; index += 1) {
+    const diff = (leftParts[index] || 0) - (rightParts[index] || 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
 }
 
 async function copyLastMoves(count = 10) {
