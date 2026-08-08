@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Crystal Front Demo</title>
-    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.17" />
+    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.18" />
   </head>
   <body>
     <main class="game-shell battle-shell" aria-label="Crystal Front demo">
@@ -62,7 +62,7 @@
           <span>TARGET</span>
           <strong id="targetScore">50</strong>
         </div>
-        <div class="system-card info-card version" data-version-check>v0.1.17</div>
+        <div class="system-card info-card version" data-version-check>v0.1.18</div>
       </section>
 
       <div id="toast" class="toast" aria-live="polite"></div>
@@ -86,7 +86,7 @@
         <footer class="menu-footer">
           <span id="menuProfile">Rating 1200</span>
           <span id="menuRays">260 Rays</span>
-          <span data-version-check>v0.1.17</span>
+          <span data-version-check>v0.1.18</span>
         </footer>
       </div>
     </section>
@@ -113,9 +113,9 @@
             <input id="setupTargetScore" type="range" min="50" max="1000" step="50" value="1000" />
           </label>
           <div class="segmented-row" aria-label="Victory mode">
-            <button class="segment is-selected" type="button">Score Target</button>
-            <button class="segment" type="button" disabled>Last Move</button>
-            <button class="segment" type="button" disabled>AI Duel</button>
+            <button class="segment is-selected" data-victory-mode="target-score" type="button">Score Target</button>
+            <button class="segment" data-victory-mode="last-move" type="button">Last Move</button>
+            <button class="segment" data-victory-mode="ai-duel" type="button">AI Duel</button>
           </div>
         </div>
         <div class="menu-actions compact">
@@ -258,6 +258,6 @@
       </div>
     </section>
 
-    <script type="module" src="./src/presentation/browser/main.js?v=0.1.17"></script>
+    <script type="module" src="./src/presentation/browser/main.js?v=0.1.18"></script>
   </body>
 </html>

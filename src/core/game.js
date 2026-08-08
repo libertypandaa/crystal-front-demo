@@ -1,4 +1,4 @@
-import { Bonus, CRYSTALS, DEFAULT_SETTINGS, Owner, Turn } from "./constants.js";
+import { Bonus, CRYSTALS, DEFAULT_SETTINGS, Owner, Turn, VictoryMode } from "./constants.js";
 import { areAdjacent, cloneCells, createBoard, findCascadeMatches, findLegalSwaps, findMatchesFromCells, getCell, refillAfterClearWithCapture, swapCrystals } from "./board.js";
 import { createRng, pick } from "./random.js";
 
@@ -56,23 +56,29 @@ export function runAiTurn(state) {
 }
 
 export function runAiTurnWithTrace(state) {
-  if (state.turn !== Turn.AI || state.winner) return { state, trace: [] };
-  const swaps = findLegalSwaps(state.cells, getMovableOwner(Owner.AI));
+  return runComputerTurnWithTrace(state, Owner.AI);
+}
+
+export function runComputerTurnWithTrace(state, actor = state.turn === Turn.Player ? Owner.Player : Owner.AI) {
+  if (state.winner || state.turn === Turn.Ended) return { state, trace: [] };
+  if (actor === Owner.Player && state.turn !== Turn.Player) return { state, trace: [] };
+  if (actor === Owner.AI && state.turn !== Turn.AI) return { state, trace: [] };
+  const swaps = findLegalSwaps(state.cells, getMovableOwner(actor));
 
   if (swaps.length === 0) {
-    const nextState = endOrPassTurn(state, Owner.AI);
-    return { state: nextState, trace: [{ type: "noMoves", actor: Owner.AI, message: nextState.events.at(-1)?.message }] };
+    const nextState = endOrPassTurn(state, actor);
+    return { state: nextState, trace: [{ type: "noMoves", actor, message: nextState.events.at(-1)?.message }] };
   }
 
   const rated = swaps
-    .map((swap) => ({ swap, preview: previewMoveWithCascade(state.cells, swap, Owner.AI) }))
+    .map((swap) => ({ swap, preview: previewMoveWithCascade(state.cells, swap, actor) }))
     .sort((a, b) => b.preview.score - a.preview.score);
 
   const weighted = weightAiMoves(rated, state.settings.aiDifficulty);
   const choiceIndex = chooseWeightedIndex(weighted, Math.random);
   const choice = rated[choiceIndex] ?? rated[0];
 
-  return submitSwapTurn(state, choice.swap.from, choice.swap.to, Owner.AI, {
+  return submitSwapTurn(state, choice.swap.from, choice.swap.to, actor, {
     aiDecision: {
       difficulty: state.settings.aiDifficulty,
       bias: getAiDifficultyBias(state.settings.aiDifficulty),
@@ -116,6 +122,7 @@ export function getSnapshot(state) {
     })),
     winner: state.winner,
     legalMoves: findLegalSwaps(state.cells, getMovableOwner(state.turn)).length,
+    playableMoves: getPlayableMoveCounts(state.cells),
   };
 }
 
@@ -436,26 +443,49 @@ function touchesEnemy(matches, actor) {
 }
 
 function checkWinner(state) {
+  if (state.settings.victoryMode === VictoryMode.LastMove || state.settings.victoryMode === VictoryMode.AiDuel) {
+    const moves = getPlayableMoveCounts(state.cells);
+    if (moves.player === 0 || moves.ai === 0) {
+      return finishByScore(state, "LastMoveEnded");
+    }
+    return state;
+  }
+
   const target = state.settings.targetScore;
   if (state.scores.player >= target || state.scores.ai >= target) {
-    const winner = state.scores.player === state.scores.ai ? "draw" : state.scores.player > state.scores.ai ? Owner.Player : Owner.AI;
-    return {
-      ...state,
-      turn: Turn.Ended,
-      winner,
-      events: [{ type: "MatchEnded", message: winner === "draw" ? "Draw." : `${winner === Owner.Player ? "You win" : "Rival wins"}.` }],
-    };
+    return finishByScore(state, "MatchEnded");
   }
 
   return state;
 }
 
 function endOrPassTurn(state, actor) {
+  if (state.settings.victoryMode === VictoryMode.LastMove || state.settings.victoryMode === VictoryMode.AiDuel) {
+    return finishByScore(state, "NoMoves");
+  }
+
   return {
     ...state,
     turn: actor === Owner.AI ? Turn.Player : Turn.AI,
     turnNumber: actor === Owner.AI ? state.turnNumber + 1 : state.turnNumber,
     events: [{ type: "NoMoves", message: `${actor === Owner.AI ? "AI" : "Player"} has no scoring move.` }],
+  };
+}
+
+function finishByScore(state, type) {
+  const winner = state.scores.player === state.scores.ai ? "draw" : state.scores.player > state.scores.ai ? Owner.Player : Owner.AI;
+  return {
+    ...state,
+    turn: Turn.Ended,
+    winner,
+    events: [{ type, message: winner === "draw" ? "Draw." : `${winner === Owner.Player ? "You win" : "Rival wins"}.` }],
+  };
+}
+
+function getPlayableMoveCounts(cells) {
+  return {
+    player: findLegalSwaps(cells, getMovableOwner(Owner.Player)).length,
+    ai: findLegalSwaps(cells, getMovableOwner(Owner.AI)).length,
   };
 }
 

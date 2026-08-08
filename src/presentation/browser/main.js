@@ -1,8 +1,8 @@
-import { Bonus, Owner, Turn } from "../../core/constants.js";
-import { createGame, getSnapshot, restart, runAiTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
+import { Bonus, Owner, Turn, VictoryMode } from "../../core/constants.js";
+import { createGame, getSnapshot, restart, runAiTurnWithTrace, runComputerTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
 import { MockRewardedAdProvider, RewardedAdStatus } from "./rewardedAds.js";
 
-const APP_VERSION = "0.1.17";
+const APP_VERSION = "0.1.18";
 const PROGRESS_STORAGE_KEY = "crystalFrontProgressV1";
 const AD_REWARD_RAYS = 40;
 const AD_COOLDOWN_MS = 60_000;
@@ -88,6 +88,7 @@ const els = {
   setupAiValue: document.querySelector("#setupAiValue"),
   setupTargetScore: document.querySelector("#setupTargetScore"),
   setupTargetValue: document.querySelector("#setupTargetValue"),
+  victoryModeButtons: [...document.querySelectorAll("[data-victory-mode]")],
   shopList: document.querySelector("#shopList"),
   leaderboardList: document.querySelector("#leaderboardList"),
   ratingValue: document.querySelector("#ratingValue"),
@@ -109,6 +110,7 @@ render();
 
 els.board.addEventListener("click", async (event) => {
   if (isAnimating || appView !== "battle") return;
+  if (state.settings.victoryMode === VictoryMode.AiDuel) return;
   const cell = event.target.closest("[data-row]");
   if (!cell) return;
   const position = {
@@ -208,6 +210,16 @@ els.setupTargetScore.addEventListener("input", () => {
   renderSetupValues();
 });
 
+els.victoryModeButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    pendingSettings = {
+      ...pendingSettings,
+      victoryMode: button.dataset.victoryMode,
+    };
+    renderSetupValues();
+  });
+});
+
 els.settingSound.addEventListener("change", () => updatePreference("sound", els.settingSound.checked));
 els.settingSfx.addEventListener("change", () => updatePreference("sfx", els.settingSfx.checked));
 els.settingAnimations.addEventListener("change", () => updatePreference("animations", els.settingAnimations.checked));
@@ -238,6 +250,14 @@ async function maybeRunAi() {
   await wait(520);
   if (appView !== "battle") return;
   await commitAnimatedTurn(runAiTurnWithTrace(state));
+}
+
+async function maybeRunAiDuel() {
+  if (appView !== "battle" || state.winner || state.settings.victoryMode !== VictoryMode.AiDuel || state.turn === Turn.Ended || isAnimating) return;
+  await wait(620);
+  if (appView !== "battle" || state.winner || state.settings.victoryMode !== VictoryMode.AiDuel || isAnimating) return;
+  await commitAnimatedTurn(runComputerTurnWithTrace(state, state.turn === Turn.Player ? Owner.Player : Owner.AI));
+  await maybeRunAiDuel();
 }
 
 async function commitAnimatedTurn(result) {
@@ -271,14 +291,18 @@ function render(snapshot = getSnapshot(state), phase = null) {
   els.turnOwner.textContent = formatTurn(snapshot);
   els.aiDifficulty.textContent = `AI ${snapshot.settings.aiDifficulty}`;
   els.playerRating.textContent = `Rating ${snapshot.profile.rating}`;
-  els.targetScore.textContent = snapshot.settings.targetScore;
+  els.targetScore.textContent = snapshot.settings.victoryMode === VictoryMode.TargetScore
+    ? snapshot.settings.targetScore
+    : snapshot.settings.victoryMode === VictoryMode.LastMove
+      ? "LAST"
+      : "DUEL";
 
   for (const bonus of Object.values(Bonus)) {
     const count = document.querySelector(`#bonus-${bonus}`);
     const button = document.querySelector(`[data-bonus="${bonus}"]`);
     count.textContent = snapshot.bonuses[bonus];
     button.classList.toggle("is-selected", snapshot.selectedBonus === bonus);
-    button.disabled = snapshot.bonuses[bonus] <= 0 || snapshot.turn !== Turn.Player || snapshot.winner || isAnimating || appView !== "battle";
+    button.disabled = snapshot.bonuses[bonus] <= 0 || snapshot.turn !== Turn.Player || snapshot.winner || isAnimating || appView !== "battle" || snapshot.settings.victoryMode === VictoryMode.AiDuel;
   }
 
   els.board.innerHTML = "";
@@ -349,6 +373,7 @@ function continueMatch() {
   if (!hasStartedMatch) return;
   appView = state.winner ? "result" : "battle";
   render();
+  maybeRunAiDuel();
 }
 
 function startNewMatch() {
@@ -356,6 +381,7 @@ function startNewMatch() {
   hasStartedMatch = true;
   appView = "battle";
   render();
+  maybeRunAiDuel();
 }
 
 function restartMatch() {
@@ -364,6 +390,7 @@ function restartMatch() {
   hasStartedMatch = true;
   appView = "battle";
   render();
+  maybeRunAiDuel();
 }
 
 function openPauseMenu() {
@@ -415,6 +442,10 @@ function renderSetupValues() {
   els.setupAiValue.textContent = pendingSettings.aiDifficulty;
   els.setupTargetScore.value = String(pendingSettings.targetScore);
   els.setupTargetValue.textContent = pendingSettings.targetScore;
+  els.setupTargetScore.disabled = pendingSettings.victoryMode !== VictoryMode.TargetScore;
+  els.victoryModeButtons.forEach((button) => {
+    button.classList.toggle("is-selected", button.dataset.victoryMode === pendingSettings.victoryMode);
+  });
 }
 
 function renderShop(snapshot) {
@@ -430,10 +461,6 @@ function renderShop(snapshot) {
     <div>
       <span>BALANCE</span>
       <strong>${snapshot.profile.rays}</strong>
-    </div>
-    <div>
-      <span>INVENTORY</span>
-      <strong>${Object.values(snapshot.bonuses).reduce((sum, value) => sum + value, 0)}</strong>
     </div>
   `;
   els.shopList.append(balance);
@@ -686,6 +713,16 @@ function formatTurn(snapshot) {
   if (snapshot.winner === Owner.Player) return "Victory";
   if (snapshot.winner === Owner.AI) return "Defeat";
   if (snapshot.winner === "draw") return "Draw";
+  if (snapshot.settings.victoryMode === VictoryMode.AiDuel) {
+    return snapshot.turn === Turn.Player
+      ? `Blue AI - ${snapshot.playableMoves.player} options`
+      : `Red AI - ${snapshot.playableMoves.ai} options`;
+  }
+  if (snapshot.settings.victoryMode === VictoryMode.LastMove) {
+    return snapshot.turn === Turn.Player
+      ? `Player move - ${snapshot.playableMoves.player} options`
+      : `AI thinking - ${snapshot.playableMoves.ai} options`;
+  }
   return snapshot.turn === Turn.Player ? `Player move - ${snapshot.legalMoves} options` : "AI thinking";
 }
 

@@ -26,9 +26,16 @@ export const Bonus = Object.freeze({
   Color: "color",
 });
 
+export const VictoryMode = Object.freeze({
+  TargetScore: "target-score",
+  LastMove: "last-move",
+  AiDuel: "ai-duel",
+});
+
 export const DEFAULT_SETTINGS = Object.freeze({
   targetScore: 1000,
   aiDifficulty: 62,
+  victoryMode: VictoryMode.TargetScore,
 });
 
 export const CRYSTALS = Object.freeze([
