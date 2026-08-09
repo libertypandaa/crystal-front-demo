@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Crystal Front Demo</title>
-    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.21" />
+    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.22" />
   </head>
   <body>
     <main class="game-shell battle-shell" aria-label="Crystal Front demo">
@@ -70,16 +70,38 @@
           <span>TARGET</span>
           <strong id="targetScore">50</strong>
         </div>
-        <div class="system-card info-card version" data-version-check>v0.1.21</div>
+        <div class="system-card info-card version" data-version-check>v0.1.22</div>
       </section>
 
       <div id="toast" class="toast" aria-live="polite"></div>
     </main>
 
+    <section id="studioSplash" class="screen-layer studio-splash" aria-label="Liberman Games">
+      <div class="studio-splash-mark">
+        <img src="./assets/runtime/liberman-games-logo.png" alt="Liberman Games" />
+      </div>
+    </section>
+
+    <section id="nicknameMenu" class="screen-layer modal-layer" aria-label="Player nickname" hidden>
+      <form id="nicknameForm" class="modal-panel nickname-panel">
+        <header class="modal-header">
+          <p>PLAYER PROFILE</p>
+          <h2>Choose Name</h2>
+        </header>
+        <label class="input-row">
+          <span>Nickname</span>
+          <input id="nicknameInput" type="text" maxlength="18" autocomplete="nickname" inputmode="text" placeholder="Your name" />
+        </label>
+        <div class="menu-actions compact">
+          <button id="nicknameSaveButton" class="menu-button primary" type="submit">Save Name</button>
+        </div>
+      </form>
+    </section>
+
     <section id="mainMenu" class="screen-layer screen-main" aria-label="Main menu">
       <div class="menu-panel">
         <header class="menu-header">
-          <p>TACTICAL CRYSTAL DUEL</p>
+          <p>LIBERMAN GAMES PRESENTS</p>
           <h1>Crystal Front</h1>
         </header>
         <div class="menu-actions">
@@ -94,7 +116,7 @@
         <footer class="menu-footer">
           <span id="menuProfile">Rating 1200</span>
           <span id="menuRays">260 Rays</span>
-          <span data-version-check>v0.1.21</span>
+          <span data-version-check>v0.1.22</span>
         </footer>
       </div>
     </section>
@@ -180,6 +202,10 @@
           <h2>System</h2>
         </header>
         <div class="control-stack">
+          <label class="input-row">
+            <span>Nickname</span>
+            <input id="settingsNickname" type="text" maxlength="18" autocomplete="nickname" inputmode="text" />
+          </label>
           <label class="toggle-row">
             <span>Sound</span>
             <input id="settingSound" type="checkbox" checked />
@@ -266,6 +292,6 @@
       </div>
     </section>
 
-    <script type="module" src="./src/presentation/browser/main.js?v=0.1.21"></script>
+    <script type="module" src="./src/presentation/browser/main.js?v=0.1.22"></script>
   </body>
 </html>

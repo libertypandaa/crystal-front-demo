@@ -54,6 +54,8 @@ body {
 }
 
 body[data-view="main"] .battle-shell,
+body[data-view="splash"] .battle-shell,
+body[data-view="nickname"] .battle-shell,
 body[data-view="setup"] .battle-shell,
 body[data-view="shop"] .battle-shell,
 body[data-view="leaderboard"] .battle-shell,
@@ -972,6 +974,32 @@ body.is-ai-duel .bonus-icon {
   display: none;
 }
 
+.studio-splash {
+  z-index: 30;
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(237, 198, 109, 0.16), transparent 34%),
+    linear-gradient(180deg, rgba(3, 8, 16, 0.96), rgba(1, 4, 9, 0.98));
+  animation: studio-splash-fade 1800ms ease forwards;
+}
+
+.studio-splash-mark {
+  display: grid;
+  width: min(78vw, 360px);
+  place-items: center;
+  filter: drop-shadow(0 22px 34px rgba(0, 0, 0, 0.54));
+  transform-origin: center;
+  animation: studio-mark-rise 1600ms ease forwards;
+}
+
+.studio-splash-mark img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid rgba(237, 198, 109, 0.34);
+  border-radius: 7px;
+  box-shadow: 0 0 34px rgba(237, 198, 109, 0.16), 0 0 56px rgba(36, 184, 255, 0.08);
+}
+
 .menu-panel,
 .modal-panel {
   display: grid;
@@ -991,6 +1019,10 @@ body.is-ai-duel .bonus-icon {
 
 .modal-panel {
   padding: clamp(16px, 3svh, 24px);
+}
+
+.nickname-panel {
+  width: min(100%, 390px);
 }
 
 .menu-scroll-panel {
@@ -1175,6 +1207,35 @@ body.is-ai-duel .bonus-icon {
   }
 }
 
+@keyframes studio-splash-fade {
+  0%,
+  72% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes studio-mark-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+
+  26%,
+  78% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  100% {
+    opacity: 0.82;
+    transform: translateY(-6px) scale(1.02);
+  }
+}
+
 .result-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -1204,6 +1265,43 @@ body.is-ai-duel .bonus-icon {
 .control-stack {
   display: grid;
   gap: var(--gap);
+}
+
+.input-row {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: clamp(10px, 2svh, 14px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-button);
+  background:
+    linear-gradient(90deg, rgba(25, 170, 245, 0.08), transparent 46%, rgba(246, 76, 115, 0.06)),
+    rgba(255, 255, 255, 0.035);
+}
+
+.input-row span {
+  color: var(--text-secondary);
+  font-size: clamp(0.78rem, 2.6vw, 0.95rem);
+  font-weight: 700;
+}
+
+.input-row input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid rgba(157, 204, 255, 0.26);
+  border-radius: var(--radius-button);
+  background: rgba(4, 9, 18, 0.78);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: clamp(1rem, 3.6vw, 1.18rem);
+  font-weight: 800;
+  padding: 0 12px;
+  outline: none;
+}
+
+.input-row input:focus {
+  border-color: rgba(57, 217, 255, 0.76);
+  box-shadow: 0 0 0 2px rgba(57, 217, 255, 0.16), 0 0 18px rgba(25, 170, 245, 0.22);
 }
 
 .control-row {

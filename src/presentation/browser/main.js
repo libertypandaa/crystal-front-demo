@@ -2,7 +2,7 @@ import { Bonus, Owner, Turn, VictoryMode } from "../../core/constants.js";
 import { createGame, getSnapshot, restart, runAiTurnWithTrace, runComputerTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
 import { MockRewardedAdProvider, RewardedAdStatus } from "./rewardedAds.js";
 
-const APP_VERSION = "0.1.21";
+const APP_VERSION = "0.1.22";
 const PROGRESS_STORAGE_KEY = "crystalFrontProgressV1";
 const PREFERENCES_STORAGE_KEY = "crystalFrontPreferencesV1";
 const ANALYTICS_STORAGE_KEY = "crystalFrontAnalyticsV1";
@@ -10,6 +10,7 @@ const AD_REWARD_RAYS = 40;
 const AD_COOLDOWN_MS = 60_000;
 const DEFAULT_PROFILE = Object.freeze({
   nickname: "Liber",
+  nicknameSet: false,
   rating: 1200,
   rays: 260,
   wins: 0,
@@ -32,7 +33,8 @@ const persistedProgress = loadPersistedProgress();
 let state = hydrateProgress(createGame(271828), persistedProgress);
 let isAnimating = false;
 let isClaimingAdReward = false;
-let appView = "main";
+let appView = "splash";
+let pendingViewAfterSplash = state.profile.nicknameSet ? "main" : "nickname";
 let hasStartedMatch = false;
 let pendingSettings = { ...state.settings };
 let setupReturnView = "main";
@@ -90,6 +92,10 @@ const els = {
   menuButton: document.querySelector("#menuButton"),
   pauseButton: document.querySelector("#pauseButton"),
   mainMenu: document.querySelector("#mainMenu"),
+  studioSplash: document.querySelector("#studioSplash"),
+  nicknameMenu: document.querySelector("#nicknameMenu"),
+  nicknameForm: document.querySelector("#nicknameForm"),
+  nicknameInput: document.querySelector("#nicknameInput"),
   setupMenu: document.querySelector("#setupMenu"),
   shopMenu: document.querySelector("#shopMenu"),
   leaderboardMenu: document.querySelector("#leaderboardMenu"),
@@ -121,6 +127,7 @@ const els = {
   settingAnimations: document.querySelector("#settingAnimations"),
   settingMotion: document.querySelector("#settingMotion"),
   settingMotionValue: document.querySelector("#settingMotionValue"),
+  settingsNickname: document.querySelector("#settingsNickname"),
   duelAssistPanel: document.querySelector("#duelAssistPanel"),
   duelSpeedSlider: document.querySelector("#duelSpeedSlider"),
   duelSpeedValue: document.querySelector("#duelSpeedValue"),
@@ -132,6 +139,13 @@ const els = {
 };
 
 render();
+window.setTimeout(() => {
+  if (appView === "splash") {
+    appView = pendingViewAfterSplash;
+    render();
+    if (appView === "nickname") els.nicknameInput.focus();
+  }
+}, 1800);
 
 els.board.addEventListener("click", async (event) => {
   if (isAnimating || appView !== "battle") return;
@@ -273,6 +287,10 @@ els.settingSound.addEventListener("change", () => updatePreference("sound", els.
 els.settingSfx.addEventListener("change", () => updatePreference("sfx", els.settingSfx.checked));
 els.settingAnimations.addEventListener("change", () => updatePreference("animations", els.settingAnimations.checked));
 els.settingMotion.addEventListener("input", () => updatePreference("motion", Number(els.settingMotion.value)));
+els.nicknameForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  saveNickname(els.nicknameInput.value, "main");
+});
 
 function handleMenuAction(action, sourceButton) {
   clearButtonFeedback({ includeRipple: true });
@@ -392,6 +410,8 @@ function render(snapshot = getSnapshot(state), phase = null) {
 function updateScreens(snapshot) {
   document.body.dataset.view = appView;
   els.mainMenu.hidden = appView !== "main";
+  els.studioSplash.hidden = appView !== "splash";
+  els.nicknameMenu.hidden = appView !== "nickname";
   els.setupMenu.hidden = appView !== "setup";
   els.shopMenu.hidden = appView !== "shop";
   els.leaderboardMenu.hidden = appView !== "leaderboard";
@@ -481,6 +501,7 @@ function openLeaderboardMenu() {
 }
 
 function openSettingsMenu() {
+  els.settingsNickname.value = state.profile.nickname;
   appView = "settings";
   render();
 }
@@ -614,6 +635,7 @@ function renderLeaderboard(snapshot) {
 }
 
 function renderSettings() {
+  els.settingsNickname.value = state.profile.nickname;
   els.settingSound.checked = uiPreferences.sound;
   els.settingSfx.checked = uiPreferences.sfx;
   els.settingAnimations.checked = uiPreferences.animations;
@@ -650,9 +672,42 @@ function updatePreference(key, value) {
 }
 
 function applySettings() {
+  const nickname = saveNicknameValue(els.settingsNickname.value);
+  if (!nickname) {
+    showToast("Enter a nickname.");
+    return;
+  }
   persistPreferences();
+  persistProgress();
+  recordLocalAnalytics("ProfileUpdated", { nickname });
   showToast("Settings applied.");
   openMainMenu();
+}
+
+function saveNickname(value, nextView = "main") {
+  const nickname = saveNicknameValue(value);
+  if (!nickname) {
+    showToast("Enter a nickname.");
+    return;
+  }
+  persistProgress();
+  recordLocalAnalytics("NicknameSaved", { nickname });
+  appView = nextView;
+  render();
+}
+
+function saveNicknameValue(value) {
+  const nickname = sanitizeNickname(value, "");
+  if (!nickname) return null;
+  state = {
+    ...state,
+    profile: {
+      ...state.profile,
+      nickname,
+      nicknameSet: true,
+    },
+  };
+  return nickname;
 }
 
 function buyBonus(bonus) {
@@ -815,6 +870,7 @@ function sanitizeProfile(profile = {}) {
   return {
     ...DEFAULT_PROFILE,
     nickname: sanitizeNickname(profile.nickname, DEFAULT_PROFILE.nickname),
+    nicknameSet: typeof profile.nicknameSet === "boolean" ? profile.nicknameSet : Boolean(profile.nickname && profile.nickname !== DEFAULT_PROFILE.nickname),
     rating: sanitizeNumber(profile.rating, DEFAULT_PROFILE.rating),
     rays: sanitizeNumber(profile.rays, DEFAULT_PROFILE.rays),
     wins: sanitizeNumber(profile.wins, DEFAULT_PROFILE.wins),
