@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Crystal Front Demo</title>
-    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.20" />
+    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.21" />
   </head>
   <body>
     <main class="game-shell battle-shell" aria-label="Crystal Front demo">
@@ -70,7 +70,7 @@
           <span>TARGET</span>
           <strong id="targetScore">50</strong>
         </div>
-        <div class="system-card info-card version" data-version-check>v0.1.20</div>
+        <div class="system-card info-card version" data-version-check>v0.1.21</div>
       </section>
 
       <div id="toast" class="toast" aria-live="polite"></div>
@@ -94,7 +94,7 @@
         <footer class="menu-footer">
           <span id="menuProfile">Rating 1200</span>
           <span id="menuRays">260 Rays</span>
-          <span data-version-check>v0.1.20</span>
+          <span data-version-check>v0.1.21</span>
         </footer>
       </div>
     </section>
@@ -106,14 +106,14 @@
           <h2>Duel Rules</h2>
         </header>
         <div class="control-stack">
-          <label id="setupTargetRow" class="control-row">
+          <label class="control-row">
             <span>
               AI Difficulty
               <strong id="setupAiValue">62</strong>
             </span>
             <input id="setupAiDifficulty" type="range" min="1" max="100" value="62" />
           </label>
-          <label class="control-row">
+          <label id="setupTargetRow" class="control-row">
             <span>
               Target Score
               <strong id="setupTargetValue">1000</strong>
@@ -162,8 +162,8 @@
             <strong id="ratingRays">260</strong>
           </div>
           <div>
-            <span>BEST</span>
-            <strong id="ratingBest">x0</strong>
+            <span>RECORD</span>
+            <strong id="ratingBest">0-0-0</strong>
           </div>
         </div>
         <div id="leaderboardList" class="rank-list"></div>
@@ -266,6 +266,6 @@
       </div>
     </section>
 
-    <script type="module" src="./src/presentation/browser/main.js?v=0.1.20"></script>
+    <script type="module" src="./src/presentation/browser/main.js?v=0.1.21"></script>
   </body>
 </html>

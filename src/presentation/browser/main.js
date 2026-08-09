@@ -2,10 +2,31 @@ import { Bonus, Owner, Turn, VictoryMode } from "../../core/constants.js";
 import { createGame, getSnapshot, restart, runAiTurnWithTrace, runComputerTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
 import { MockRewardedAdProvider, RewardedAdStatus } from "./rewardedAds.js";
 
-const APP_VERSION = "0.1.20";
+const APP_VERSION = "0.1.21";
 const PROGRESS_STORAGE_KEY = "crystalFrontProgressV1";
+const PREFERENCES_STORAGE_KEY = "crystalFrontPreferencesV1";
+const ANALYTICS_STORAGE_KEY = "crystalFrontAnalyticsV1";
 const AD_REWARD_RAYS = 40;
 const AD_COOLDOWN_MS = 60_000;
+const DEFAULT_PROFILE = Object.freeze({
+  nickname: "Liber",
+  rating: 1200,
+  rays: 260,
+  wins: 0,
+  losses: 0,
+  draws: 0,
+  matchesPlayed: 0,
+  aiDuelMatches: 0,
+  bestCombo: 0,
+  bestCascade: 0,
+  lifetimeScore: 0,
+});
+const DEFAULT_PREFERENCES = Object.freeze({
+  sound: true,
+  sfx: true,
+  animations: true,
+  motion: 100,
+});
 
 const persistedProgress = loadPersistedProgress();
 let state = hydrateProgress(createGame(271828), persistedProgress);
@@ -16,12 +37,8 @@ let hasStartedMatch = false;
 let pendingSettings = { ...state.settings };
 let setupReturnView = "main";
 let duelSpeedPower = 0;
-let uiPreferences = {
-  sound: true,
-  sfx: true,
-  animations: true,
-  motion: 100,
-};
+let uiPreferences = loadPersistedPreferences();
+let currentMatchFinalized = false;
 
 const shopItems = [
   { bonus: Bonus.Bomb, label: "Bomb", detail: "Clears a 3x3 strike zone.", cost: 35 },
@@ -55,6 +72,7 @@ window.crystalFrontDebug = {
   getLastMoves: (count = 5) => getSnapshot(state).moveHistory.slice(-count),
   dumpLastMoves: (count = 5) => JSON.stringify(getSnapshot(state).moveHistory.slice(-count), null, 2),
   copyLastMoves: (count = 10) => copyLastMoves(count),
+  getAnalytics: () => loadAnalyticsEvents(),
 };
 
 const els = {
@@ -301,6 +319,10 @@ async function commitAnimatedTurn(result) {
   }
 
   state = result.state;
+  if (state.winner && !currentMatchFinalized) {
+    state = finalizeMatchProgress(state);
+    currentMatchFinalized = true;
+  }
   persistLastMoves();
   persistProgress();
   isAnimating = false;
@@ -320,7 +342,7 @@ function render(snapshot = getSnapshot(state), phase = null) {
   els.aiScore.textContent = snapshot.scores.ai;
   els.turnNumber.textContent = snapshot.turnNumber;
   els.turnOwner.textContent = formatTurn(snapshot);
-  els.playerName.textContent = snapshot.settings.victoryMode === VictoryMode.AiDuel ? "BLUE AI" : "YOU";
+  els.playerName.textContent = snapshot.settings.victoryMode === VictoryMode.AiDuel ? "BLUE AI" : snapshot.profile.nickname;
   els.aiName.textContent = snapshot.settings.victoryMode === VictoryMode.AiDuel ? "RED AI" : "RIVAL";
   els.aiDifficulty.textContent = `AI ${snapshot.settings.aiDifficulty}`;
   els.playerRating.textContent = snapshot.settings.victoryMode === VictoryMode.AiDuel ? `AI ${snapshot.settings.aiDifficulty}` : `Rating ${snapshot.profile.rating}`;
@@ -378,7 +400,7 @@ function updateScreens(snapshot) {
   els.resultMenu.hidden = appView !== "result";
   els.exitMenu.hidden = appView !== "exit";
   els.continueButton.disabled = !hasStartedMatch;
-  els.menuProfile.textContent = `Rating ${snapshot.profile.rating}`;
+  els.menuProfile.textContent = `${snapshot.profile.nickname} - Rating ${snapshot.profile.rating}`;
   els.menuRays.textContent = `${snapshot.profile.rays} Rays`;
   renderSetupValues();
   renderShop(snapshot);
@@ -399,8 +421,9 @@ function updateResult(snapshot) {
   els.resultTitle.textContent = title;
   els.resultPlayerScore.textContent = snapshot.scores.player;
   els.resultAiScore.textContent = snapshot.scores.ai;
-  els.resultRating.textContent = snapshot.profile.rating;
-  els.resultRays.textContent = snapshot.profile.rays;
+  const match = snapshot.profile.lastMatch;
+  els.resultRating.textContent = match?.ratingDelta ? `${snapshot.profile.rating} (+${match.ratingDelta})` : snapshot.profile.rating;
+  els.resultRays.textContent = match?.raysDelta ? `${snapshot.profile.rays} (+${match.raysDelta})` : snapshot.profile.rays;
 }
 
 function continueMatch() {
@@ -412,6 +435,7 @@ function continueMatch() {
 
 function startNewMatch() {
   state = hydrateProgress(createGame(Date.now(), pendingSettings));
+  currentMatchFinalized = false;
   hasStartedMatch = true;
   appView = "battle";
   render();
@@ -421,6 +445,7 @@ function startNewMatch() {
 function restartMatch() {
   if (isAnimating) return;
   state = hydrateProgress(restart(state));
+  currentMatchFinalized = false;
   hasStartedMatch = true;
   appView = "battle";
   render();
@@ -562,11 +587,16 @@ function renderShop(snapshot) {
 function renderLeaderboard(snapshot) {
   els.ratingValue.textContent = snapshot.profile.rating;
   els.ratingRays.textContent = snapshot.profile.rays;
-  els.ratingBest.textContent = `x${Math.max(0, ...snapshot.moveHistory.map((move) => move.cascades ?? 0))}`;
+  els.ratingBest.textContent = `${snapshot.profile.wins}-${snapshot.profile.losses}-${snapshot.profile.draws}`;
 
   const rows = [
     ...rivals,
-    { name: "You", rating: snapshot.profile.rating, record: `${snapshot.scores.player}-${snapshot.scores.ai}`, player: true },
+    {
+      name: snapshot.profile.nickname,
+      rating: snapshot.profile.rating,
+      record: `${snapshot.profile.wins}-${snapshot.profile.losses}-${snapshot.profile.draws}`,
+      player: true,
+    },
   ].sort((a, b) => b.rating - a.rating);
 
   els.leaderboardList.innerHTML = "";
@@ -614,10 +644,13 @@ function getDuelAnimationSpeed() {
 
 function updatePreference(key, value) {
   uiPreferences = { ...uiPreferences, [key]: value };
+  persistPreferences();
+  recordLocalAnalytics("PreferenceChanged", { key, value });
   renderSettings();
 }
 
 function applySettings() {
+  persistPreferences();
   showToast("Settings applied.");
   openMainMenu();
 }
@@ -642,6 +675,7 @@ function buyBonus(bonus) {
     events: [{ type: "ShopPurchase", message: `${item.label} purchased.` }],
   };
   persistProgress();
+  recordLocalAnalytics("ShopPurchase", { bonus, cost: item.cost, rays: state.profile.rays });
   render();
 }
 
@@ -675,28 +709,123 @@ async function claimAdReward() {
     events: [{ type: "ShopReward", message: `+${AD_REWARD_RAYS} Rays claimed via ${result.provider}.` }],
   };
   persistProgress();
+  recordLocalAnalytics("RewardedAdClaimed", { provider: result.provider, raysDelta: AD_REWARD_RAYS, rays: state.profile.rays });
   render();
 }
 
+function finalizeMatchProgress(finishedState) {
+  const snapshot = getSnapshot(finishedState);
+  const isAiDuel = snapshot.settings.victoryMode === VictoryMode.AiDuel;
+  const result = snapshot.winner === Owner.Player
+    ? "win"
+    : snapshot.winner === Owner.AI
+      ? "loss"
+      : "draw";
+  const bestCombo = Math.max(0, ...snapshot.moveHistory.map((move) => getMoveComboSize(move)));
+  const bestCascade = Math.max(0, ...snapshot.moveHistory.map((move) => move.cascades ?? 0));
+  const playerScore = snapshot.scores.player;
+  const aiScore = snapshot.scores.ai;
+  const reward = isAiDuel
+    ? { ratingDelta: 0, raysDelta: 0, notes: ["AI Duel simulation recorded."] }
+    : calculateMatchReward(result, playerScore, aiScore, bestCombo, bestCascade);
+  const profile = {
+    ...finishedState.profile,
+    rating: Math.max(0, finishedState.profile.rating + reward.ratingDelta),
+    rays: finishedState.profile.rays + reward.raysDelta,
+    wins: finishedState.profile.wins + (!isAiDuel && result === "win" ? 1 : 0),
+    losses: finishedState.profile.losses + (!isAiDuel && result === "loss" ? 1 : 0),
+    draws: finishedState.profile.draws + (!isAiDuel && result === "draw" ? 1 : 0),
+    matchesPlayed: finishedState.profile.matchesPlayed + (isAiDuel ? 0 : 1),
+    aiDuelMatches: finishedState.profile.aiDuelMatches + (isAiDuel ? 1 : 0),
+    bestCombo: Math.max(finishedState.profile.bestCombo, bestCombo),
+    bestCascade: Math.max(finishedState.profile.bestCascade, bestCascade),
+    lifetimeScore: finishedState.profile.lifetimeScore + playerScore,
+    lastMatch: {
+      mode: snapshot.settings.victoryMode,
+      result,
+      playerScore,
+      aiScore,
+      ratingDelta: reward.ratingDelta,
+      raysDelta: reward.raysDelta,
+      bestCombo,
+      bestCascade,
+      notes: reward.notes,
+      completedAt: new Date().toISOString(),
+    },
+  };
+  recordLocalAnalytics("MatchCompleted", profile.lastMatch);
+
+  return {
+    ...finishedState,
+    profile,
+    events: [
+      {
+        type: "ProgressUpdated",
+        message: reward.raysDelta > 0
+          ? `Progress saved. +${reward.raysDelta} Rays.`
+          : "Progress saved.",
+      },
+    ],
+  };
+}
+
+function calculateMatchReward(result, playerScore, aiScore, bestCombo, bestCascade) {
+  const base = result === "win"
+    ? { ratingDelta: 24, raysDelta: 60, notes: ["Victory reward."] }
+    : result === "draw"
+      ? { ratingDelta: 8, raysDelta: 25, notes: ["Draw reward."] }
+      : { ratingDelta: 3, raysDelta: 10, notes: ["Battle participation reward."] };
+  const comboBonus = Math.max(0, bestCombo - 3) * 2;
+  const cascadeBonus = Math.max(0, bestCascade - 1) * 12;
+  const scoreBonus = result === "win" && playerScore >= 100 ? 20 : 0;
+  const shutoutBonus = result === "win" && aiScore === 0 ? 30 : 0;
+  const notes = [...base.notes];
+
+  if (comboBonus > 0) notes.push(`Combo bonus +${comboBonus} Rays.`);
+  if (cascadeBonus > 0) notes.push(`Cascade bonus +${cascadeBonus} Rays.`);
+  if (scoreBonus > 0) notes.push("Score 100+ achievement.");
+  if (shutoutBonus > 0) notes.push("Clean victory achievement.");
+
+  return {
+    ratingDelta: base.ratingDelta + Math.floor(comboBonus / 2) + Math.floor(cascadeBonus / 3) + Math.floor(scoreBonus / 4) + Math.floor(shutoutBonus / 5),
+    raysDelta: base.raysDelta + comboBonus + cascadeBonus + scoreBonus + shutoutBonus,
+    notes,
+  };
+}
+
+function getMoveComboSize(move) {
+  return Math.max(0, ...(move.matched ?? []).map((match) => match.ids?.length ?? 0));
+}
+
 function hydrateProgress(gameState, progress = loadPersistedProgress()) {
-  if (!progress) return gameState;
   return {
     ...gameState,
     profile: {
       ...gameState.profile,
-      ...sanitizeProfile(progress.profile),
+      ...sanitizeProfile(progress?.profile ?? gameState.profile),
     },
     bonuses: {
       ...gameState.bonuses,
-      ...sanitizeBonuses(progress.bonuses),
+      ...sanitizeBonuses(progress?.bonuses ?? gameState.bonuses),
     },
   };
 }
 
 function sanitizeProfile(profile = {}) {
   return {
-    rating: sanitizeNumber(profile.rating, 1200),
-    rays: sanitizeNumber(profile.rays, 260),
+    ...DEFAULT_PROFILE,
+    nickname: sanitizeNickname(profile.nickname, DEFAULT_PROFILE.nickname),
+    rating: sanitizeNumber(profile.rating, DEFAULT_PROFILE.rating),
+    rays: sanitizeNumber(profile.rays, DEFAULT_PROFILE.rays),
+    wins: sanitizeNumber(profile.wins, DEFAULT_PROFILE.wins),
+    losses: sanitizeNumber(profile.losses, DEFAULT_PROFILE.losses),
+    draws: sanitizeNumber(profile.draws, DEFAULT_PROFILE.draws),
+    matchesPlayed: sanitizeNumber(profile.matchesPlayed, DEFAULT_PROFILE.matchesPlayed),
+    aiDuelMatches: sanitizeNumber(profile.aiDuelMatches, DEFAULT_PROFILE.aiDuelMatches),
+    bestCombo: sanitizeNumber(profile.bestCombo, DEFAULT_PROFILE.bestCombo),
+    bestCascade: sanitizeNumber(profile.bestCascade, DEFAULT_PROFILE.bestCascade),
+    lifetimeScore: sanitizeNumber(profile.lifetimeScore, DEFAULT_PROFILE.lifetimeScore),
+    lastMatch: profile.lastMatch && typeof profile.lastMatch === "object" ? profile.lastMatch : null,
   };
 }
 
@@ -714,6 +843,11 @@ function sanitizeNumber(value, fallback) {
   return Number.isFinite(number) && number >= 0 ? Math.floor(number) : fallback;
 }
 
+function sanitizeNickname(value, fallback) {
+  const nickname = String(value ?? "").trim();
+  return nickname.length > 0 ? nickname.slice(0, 18) : fallback;
+}
+
 function loadPersistedProgress() {
   try {
     const raw = window.localStorage.getItem(PROGRESS_STORAGE_KEY);
@@ -721,6 +855,25 @@ function loadPersistedProgress() {
   } catch {
     return null;
   }
+}
+
+function loadPersistedPreferences() {
+  try {
+    const raw = window.localStorage.getItem(PREFERENCES_STORAGE_KEY);
+    return sanitizePreferences(raw ? JSON.parse(raw) : null);
+  } catch {
+    return { ...DEFAULT_PREFERENCES };
+  }
+}
+
+function sanitizePreferences(preferences = {}) {
+  const source = preferences ?? {};
+  return {
+    sound: typeof source.sound === "boolean" ? source.sound : DEFAULT_PREFERENCES.sound,
+    sfx: typeof source.sfx === "boolean" ? source.sfx : DEFAULT_PREFERENCES.sfx,
+    animations: typeof source.animations === "boolean" ? source.animations : DEFAULT_PREFERENCES.animations,
+    motion: Math.max(0, Math.min(100, sanitizeNumber(source.motion, DEFAULT_PREFERENCES.motion))),
+  };
 }
 
 function persistProgress() {
@@ -733,6 +886,42 @@ function persistProgress() {
     }));
   } catch {
     // Progress persistence is best-effort in private or restricted browser modes.
+  }
+}
+
+function persistPreferences() {
+  try {
+    window.localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify({
+      version: APP_VERSION,
+      ...uiPreferences,
+    }));
+  } catch {
+    // Preference persistence is best-effort in private or restricted browser modes.
+  }
+}
+
+function loadAnalyticsEvents() {
+  try {
+    const raw = window.localStorage.getItem(ANALYTICS_STORAGE_KEY);
+    const events = raw ? JSON.parse(raw) : [];
+    return Array.isArray(events) ? events : [];
+  } catch {
+    return [];
+  }
+}
+
+function recordLocalAnalytics(type, payload = {}) {
+  try {
+    const events = loadAnalyticsEvents();
+    events.push({
+      type,
+      payload,
+      version: APP_VERSION,
+      createdAt: new Date().toISOString(),
+    });
+    window.localStorage.setItem(ANALYTICS_STORAGE_KEY, JSON.stringify(events.slice(-100)));
+  } catch {
+    // Local analytics are optional debug data.
   }
 }
 
