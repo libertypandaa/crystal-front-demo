@@ -2,10 +2,13 @@ import { Bonus, Owner, Turn, VictoryMode } from "../../core/constants.js";
 import { createGame, getSnapshot, restart, runAiTurnWithTrace, runComputerTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
 import { MockRewardedAdProvider, RewardedAdStatus } from "./rewardedAds.js";
 
-const APP_VERSION = "0.1.22";
+const APP_VERSION = "0.1.23";
 const PROGRESS_STORAGE_KEY = "crystalFrontProgressV1";
 const PREFERENCES_STORAGE_KEY = "crystalFrontPreferencesV1";
 const ANALYTICS_STORAGE_KEY = "crystalFrontAnalyticsV1";
+const AUDIO_ASSETS = Object.freeze({
+  studioSplash: "./assets/runtime/audio/studio-splash.mp3",
+});
 const AD_REWARD_RAYS = 40;
 const AD_COOLDOWN_MS = 60_000;
 const DEFAULT_PROFILE = Object.freeze({
@@ -41,6 +44,7 @@ let setupReturnView = "main";
 let duelSpeedPower = 0;
 let uiPreferences = loadPersistedPreferences();
 let currentMatchFinalized = false;
+let audioController = createAudioController();
 
 const shopItems = [
   { bonus: Bonus.Bomb, label: "Bomb", detail: "Clears a 3x3 strike zone.", cost: 35 },
@@ -139,6 +143,7 @@ const els = {
 };
 
 render();
+playStudioSplash();
 window.setTimeout(() => {
   if (appView === "splash") {
     appView = pendingViewAfterSplash;
@@ -222,6 +227,7 @@ document.addEventListener("click", (event) => {
 });
 
 document.addEventListener("pointerdown", (event) => {
+  audioController.unlock();
   const button = event.target.closest("button");
   if (!button || button.disabled) return;
   updateButtonPointer(button, event);
@@ -668,6 +674,7 @@ function updatePreference(key, value) {
   uiPreferences = { ...uiPreferences, [key]: value };
   persistPreferences();
   recordLocalAnalytics("PreferenceChanged", { key, value });
+  if (key === "sound" || key === "sfx") audioController = createAudioController();
   renderSettings();
 }
 
@@ -1030,6 +1037,52 @@ function showToast(message) {
   els.toast.classList.add("is-visible");
   window.clearTimeout(showToast.timer);
   showToast.timer = window.setTimeout(() => els.toast.classList.remove("is-visible"), 1800);
+}
+
+function playStudioSplash() {
+  audioController.play("studioSplash");
+}
+
+function createAudioController() {
+  const cache = new Map();
+  const blockedQueue = new Set();
+
+  function canPlay() {
+    return uiPreferences.sound && uiPreferences.sfx;
+  }
+
+  function getAudio(name) {
+    if (!AUDIO_ASSETS[name]) return null;
+    if (!cache.has(name)) {
+      const audio = new Audio(AUDIO_ASSETS[name]);
+      audio.preload = "auto";
+      audio.volume = name === "studioSplash" ? 0.78 : 0.7;
+      cache.set(name, audio);
+    }
+    return cache.get(name);
+  }
+
+  async function play(name) {
+    if (!canPlay()) return;
+    const audio = getAudio(name);
+    if (!audio) return;
+    try {
+      audio.currentTime = 0;
+      await audio.play();
+      blockedQueue.delete(name);
+    } catch {
+      blockedQueue.add(name);
+    }
+  }
+
+  function unlock() {
+    if (!canPlay() || blockedQueue.size === 0) return;
+    const queued = [...blockedQueue];
+    blockedQueue.clear();
+    queued.forEach((name) => play(name));
+  }
+
+  return { play, unlock };
 }
 
 async function checkForLatestVersion() {
