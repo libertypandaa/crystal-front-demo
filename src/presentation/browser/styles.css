@@ -1285,7 +1285,8 @@ body.is-ai-duel .bonus-icon {
   font-weight: 700;
 }
 
-.input-row input {
+.input-row input,
+.input-row select {
   width: 100%;
   min-height: 48px;
   border: 1px solid rgba(157, 204, 255, 0.26);
@@ -1299,7 +1300,12 @@ body.is-ai-duel .bonus-icon {
   outline: none;
 }
 
-.input-row input:focus {
+.input-row select {
+  cursor: pointer;
+}
+
+.input-row input:focus,
+.input-row select:focus {
   border-color: rgba(57, 217, 255, 0.76);
   box-shadow: 0 0 0 2px rgba(57, 217, 255, 0.16), 0 0 18px rgba(25, 170, 245, 0.22);
 }

@@ -2,13 +2,21 @@ import { Bonus, Owner, Turn, VictoryMode } from "../../core/constants.js";
 import { createGame, getSnapshot, restart, runAiTurnWithTrace, runComputerTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
 import { MockRewardedAdProvider, RewardedAdStatus } from "./rewardedAds.js";
 
-const APP_VERSION = "0.1.23";
+const APP_VERSION = "0.1.24";
 const PROGRESS_STORAGE_KEY = "crystalFrontProgressV1";
 const PREFERENCES_STORAGE_KEY = "crystalFrontPreferencesV1";
 const ANALYTICS_STORAGE_KEY = "crystalFrontAnalyticsV1";
+const SFX_ROOT = "./assets/generated/audio/core-sfx-kits-v1";
 const AUDIO_ASSETS = Object.freeze({
   studioSplash: "./assets/runtime/audio/studio-splash.mp3",
 });
+const SFX_KITS = Object.freeze([
+  "01_lighthouse_clean",
+  "02_dark_ocean",
+  "03_crystal_arcade",
+  "04_premium_cinematic",
+  "05_minimal_soft",
+]);
 const AD_REWARD_RAYS = 40;
 const AD_COOLDOWN_MS = 60_000;
 const DEFAULT_PROFILE = Object.freeze({
@@ -28,6 +36,7 @@ const DEFAULT_PROFILE = Object.freeze({
 const DEFAULT_PREFERENCES = Object.freeze({
   sound: true,
   sfx: true,
+  sfxKit: "01_lighthouse_clean",
   animations: true,
   motion: 100,
 });
@@ -45,6 +54,7 @@ let duelSpeedPower = 0;
 let uiPreferences = loadPersistedPreferences();
 let currentMatchFinalized = false;
 let audioController = createAudioController();
+let lastResultSoundKey = null;
 
 const shopItems = [
   { bonus: Bonus.Bomb, label: "Bomb", detail: "Clears a 3x3 strike zone.", cost: 35 },
@@ -128,6 +138,7 @@ const els = {
   ratingBest: document.querySelector("#ratingBest"),
   settingSound: document.querySelector("#settingSound"),
   settingSfx: document.querySelector("#settingSfx"),
+  settingSfxKit: document.querySelector("#settingSfxKit"),
   settingAnimations: document.querySelector("#settingAnimations"),
   settingMotion: document.querySelector("#settingMotion"),
   settingMotionValue: document.querySelector("#settingMotionValue"),
@@ -180,6 +191,7 @@ els.board.addEventListener("click", async (event) => {
     return;
   }
 
+  playSfx("cell_select");
   state = selectCell(state, position);
   render();
   await maybeRunAi();
@@ -192,14 +204,17 @@ document.querySelectorAll("[data-bonus]").forEach((button) => {
       const bonus = button.dataset.bonus;
       if (state.bonuses[bonus] <= 0) {
         showToast("No bonus charges left.");
+        playSfx("swap_reject");
         return;
       }
+      playSfx(state.selectedBonus === bonus ? "ui_back" : "cell_select");
       state = {
         ...state,
         selected: null,
         selectedBonus: state.selectedBonus === bonus ? null : bonus,
       };
     } else {
+      playSfx(state.selectedBonus === button.dataset.bonus ? "ui_back" : "cell_select");
       state = selectBonus(state, button.dataset.bonus);
     }
     render();
@@ -291,6 +306,7 @@ els.duelSpeedSlider.addEventListener("input", () => {
 
 els.settingSound.addEventListener("change", () => updatePreference("sound", els.settingSound.checked));
 els.settingSfx.addEventListener("change", () => updatePreference("sfx", els.settingSfx.checked));
+els.settingSfxKit.addEventListener("change", () => updatePreference("sfxKit", els.settingSfxKit.value));
 els.settingAnimations.addEventListener("change", () => updatePreference("animations", els.settingAnimations.checked));
 els.settingMotion.addEventListener("input", () => updatePreference("motion", Number(els.settingMotion.value)));
 els.nicknameForm.addEventListener("submit", (event) => {
@@ -300,6 +316,7 @@ els.nicknameForm.addEventListener("submit", (event) => {
 
 function handleMenuAction(action, sourceButton) {
   clearButtonFeedback({ includeRipple: true });
+  playMenuActionSound(action);
   if (action === "start") startNewMatch();
   if (action === "continue") continueMatch();
   if (action === "setup") openSetupMenu();
@@ -338,6 +355,7 @@ async function commitAnimatedTurn(result) {
   document.body.classList.add("is-animating");
 
   for (const phase of result.trace) {
+    playPhaseSound(phase);
     if (phase.cells) render(makeSnapshot(phase.cells), phase);
     await wait(getPhaseDuration(phase) / getDuelAnimationSpeed());
   }
@@ -353,6 +371,7 @@ async function commitAnimatedTurn(result) {
   document.body.classList.remove("is-animating");
   if (state.winner) appView = "result";
   render();
+  playResultSound();
 }
 
 function render(snapshot = getSnapshot(state), phase = null) {
@@ -462,6 +481,7 @@ function continueMatch() {
 function startNewMatch() {
   state = hydrateProgress(createGame(Date.now(), pendingSettings));
   currentMatchFinalized = false;
+  lastResultSoundKey = null;
   hasStartedMatch = true;
   appView = "battle";
   render();
@@ -472,6 +492,7 @@ function restartMatch() {
   if (isAnimating) return;
   state = hydrateProgress(restart(state));
   currentMatchFinalized = false;
+  lastResultSoundKey = null;
   hasStartedMatch = true;
   appView = "battle";
   render();
@@ -480,6 +501,7 @@ function restartMatch() {
 
 function openPauseMenu() {
   if (isAnimating || appView !== "battle" || state.winner) return;
+  playSfx("pause");
   appView = "pause";
   render();
 }
@@ -644,6 +666,7 @@ function renderSettings() {
   els.settingsNickname.value = state.profile.nickname;
   els.settingSound.checked = uiPreferences.sound;
   els.settingSfx.checked = uiPreferences.sfx;
+  els.settingSfxKit.value = uiPreferences.sfxKit;
   els.settingAnimations.checked = uiPreferences.animations;
   els.settingMotion.value = String(uiPreferences.motion);
   els.settingMotionValue.textContent = `${uiPreferences.motion}%`;
@@ -674,7 +697,10 @@ function updatePreference(key, value) {
   uiPreferences = { ...uiPreferences, [key]: value };
   persistPreferences();
   recordLocalAnalytics("PreferenceChanged", { key, value });
-  if (key === "sound" || key === "sfx") audioController = createAudioController();
+  if (key === "sound" || key === "sfx" || key === "sfxKit") {
+    audioController = createAudioController();
+    if (key === "sfxKit") playSfx("ui_confirm");
+  }
   renderSettings();
 }
 
@@ -721,6 +747,7 @@ function buyBonus(bonus) {
   const item = shopItems.find((candidate) => candidate.bonus === bonus);
   if (!item || state.profile.rays < item.cost) {
     showToast("Not enough Rays.");
+    playSfx("swap_reject");
     return;
   }
 
@@ -738,6 +765,7 @@ function buyBonus(bonus) {
   };
   persistProgress();
   recordLocalAnalytics("ShopPurchase", { bonus, cost: item.cost, rays: state.profile.rays });
+  playSfx("shop_purchase");
   render();
 }
 
@@ -772,6 +800,7 @@ async function claimAdReward() {
   };
   persistProgress();
   recordLocalAnalytics("RewardedAdClaimed", { provider: result.provider, raysDelta: AD_REWARD_RAYS, rays: state.profile.rays });
+  playSfx("reward_rays");
   render();
 }
 
@@ -934,6 +963,7 @@ function sanitizePreferences(preferences = {}) {
   return {
     sound: typeof source.sound === "boolean" ? source.sound : DEFAULT_PREFERENCES.sound,
     sfx: typeof source.sfx === "boolean" ? source.sfx : DEFAULT_PREFERENCES.sfx,
+    sfxKit: SFX_KITS.includes(source.sfxKit) ? source.sfxKit : DEFAULT_PREFERENCES.sfxKit,
     animations: typeof source.animations === "boolean" ? source.animations : DEFAULT_PREFERENCES.animations,
     motion: Math.max(0, Math.min(100, sanitizeNumber(source.motion, DEFAULT_PREFERENCES.motion))),
   };
@@ -1043,6 +1073,67 @@ function playStudioSplash() {
   audioController.play("studioSplash");
 }
 
+function playSfx(name) {
+  audioController.play(name);
+}
+
+function playMenuActionSound(action) {
+  if (action === "setup-back" || action === "main" || action === "exit-game") {
+    playSfx(action === "exit-game" ? "ui_back" : "ui_back");
+    return;
+  }
+  if (action === "start" || action === "setup-start" || action === "settings-apply" || action === "buy-bonus" || action === "claim-ad-reward") {
+    playSfx("ui_confirm");
+    return;
+  }
+  if (action === "resume" || action === "restart") {
+    playSfx("pause");
+    return;
+  }
+  playSfx("ui_tap");
+}
+
+function playPhaseSound(phase) {
+  if (!phase) return;
+  if (phase.type === "swap") {
+    playSfx(phase.actor === Owner.AI ? "turn_ai" : "swap");
+    if (phase.actor === Owner.AI) window.setTimeout(() => playSfx("swap"), 140);
+    return;
+  }
+  if (phase.type === "rejected") {
+    playSfx("swap_reject");
+    return;
+  }
+  if (phase.type === "bonus") {
+    playSfx(`bonus_${phase.bonus}`);
+    return;
+  }
+  if (phase.type === "mix") {
+    playSfx("bonus_mix");
+    return;
+  }
+  if (phase.type === "match") {
+    playSfx(phase.cascade > 1 ? "combo_cascade" : "match_clear");
+    return;
+  }
+  if (phase.type === "refill") {
+    playSfx("refill");
+    return;
+  }
+  if (phase.type === "advance") {
+    playSfx("front_advance");
+  }
+}
+
+function playResultSound() {
+  if (!state.winner) return;
+  const soundName = state.winner === Owner.Player ? "victory" : state.winner === Owner.AI ? "defeat" : "draw";
+  const key = `${state.turnNumber}:${soundName}:${state.scores.player}:${state.scores.ai}`;
+  if (lastResultSoundKey === key) return;
+  lastResultSoundKey = key;
+  playSfx(soundName);
+}
+
 function createAudioController() {
   const cache = new Map();
   const blockedQueue = new Set();
@@ -1052,14 +1143,15 @@ function createAudioController() {
   }
 
   function getAudio(name) {
-    if (!AUDIO_ASSETS[name]) return null;
-    if (!cache.has(name)) {
-      const audio = new Audio(AUDIO_ASSETS[name]);
+    const source = getAudioSource(name);
+    if (!source) return null;
+    if (!cache.has(source)) {
+      const audio = new Audio(source);
       audio.preload = "auto";
       audio.volume = name === "studioSplash" ? 0.78 : 0.7;
-      cache.set(name, audio);
+      cache.set(source, audio);
     }
-    return cache.get(name);
+    return cache.get(source);
   }
 
   async function play(name) {
@@ -1083,6 +1175,12 @@ function createAudioController() {
   }
 
   return { play, unlock };
+}
+
+function getAudioSource(name) {
+  if (AUDIO_ASSETS[name]) return AUDIO_ASSETS[name];
+  if (!uiPreferences.sfxKit || !SFX_KITS.includes(uiPreferences.sfxKit)) return null;
+  return `${SFX_ROOT}/${uiPreferences.sfxKit}/${name}.mp3`;
 }
 
 async function checkForLatestVersion() {

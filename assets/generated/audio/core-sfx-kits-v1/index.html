@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crystal Front Core SFX Kits v1</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #071019;
+        color: #edf7ff;
+      }
+
+      body {
+        margin: 0;
+        padding: 24px;
+        background:
+          radial-gradient(circle at 20% 0%, rgba(28, 169, 217, 0.22), transparent 34%),
+          radial-gradient(circle at 80% 15%, rgba(218, 64, 122, 0.17), transparent 30%),
+          #071019;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      header {
+        max-width: 920px;
+        margin: 0 auto 24px;
+      }
+
+      h1 {
+        font-size: clamp(28px, 5vw, 54px);
+      }
+
+      header p {
+        margin-top: 8px;
+        color: #a8bed0;
+      }
+
+      .kits {
+        display: grid;
+        gap: 18px;
+        max-width: 1100px;
+        margin: 0 auto;
+      }
+
+      section {
+        border: 1px solid rgba(125, 200, 255, 0.22);
+        border-radius: 8px;
+        background: rgba(5, 14, 25, 0.82);
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.24);
+        padding: 16px;
+      }
+
+      h2 {
+        font-size: 20px;
+        margin-bottom: 14px;
+        color: #ffd978;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 12px;
+      }
+
+      article {
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 8px;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      strong {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      audio {
+        width: 100%;
+        height: 34px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Crystal Front Core SFX Kits v1</h1>
+      <p>Five complete sound directions. Each kit has the same 21 core gameplay events.</p>
+    </header>
+    <main id="kits" class="kits"></main>
+    <script>
+      const events = [
+        "ui_tap",
+        "ui_confirm",
+        "ui_back",
+        "cell_select",
+        "swap",
+        "swap_reject",
+        "match_clear",
+        "combo_cascade",
+        "front_advance",
+        "refill",
+        "bonus_bomb",
+        "bonus_line",
+        "bonus_mix",
+        "bonus_color",
+        "turn_ai",
+        "pause",
+        "shop_purchase",
+        "reward_rays",
+        "victory",
+        "defeat",
+        "draw",
+      ];
+
+      const kits = [
+        ["01_lighthouse_clean", "01 Lighthouse Clean"],
+        ["02_dark_ocean", "02 Dark Ocean"],
+        ["03_crystal_arcade", "03 Crystal Arcade"],
+        ["04_premium_cinematic", "04 Premium Cinematic"],
+        ["05_minimal_soft", "05 Minimal Soft"],
+      ];
+
+      document.querySelector("#kits").innerHTML = kits
+        .map(([dir, label]) => `
+          <section>
+            <h2>${label}</h2>
+            <div class="grid">
+              ${events
+                .map((eventName) => `
+                  <article>
+                    <strong>${eventName}</strong>
+                    <audio controls preload="none" src="./${dir}/${eventName}.mp3"></audio>
+                  </article>
+                `)
+                .join("")}
+            </div>
+          </section>
+        `)
+        .join("");
+    </script>
+  </body>
+</html>

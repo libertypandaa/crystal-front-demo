@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Crystal Front Demo</title>
-    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.23" />
+    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.24" />
   </head>
   <body>
     <main class="game-shell battle-shell" aria-label="Crystal Front demo">
@@ -70,7 +70,7 @@
           <span>TARGET</span>
           <strong id="targetScore">50</strong>
         </div>
-        <div class="system-card info-card version" data-version-check>v0.1.23</div>
+        <div class="system-card info-card version" data-version-check>v0.1.24</div>
       </section>
 
       <div id="toast" class="toast" aria-live="polite"></div>
@@ -116,7 +116,7 @@
         <footer class="menu-footer">
           <span id="menuProfile">Rating 1200</span>
           <span id="menuRays">260 Rays</span>
-          <span data-version-check>v0.1.23</span>
+          <span data-version-check>v0.1.24</span>
         </footer>
       </div>
     </section>
@@ -214,6 +214,16 @@
             <span>SFX</span>
             <input id="settingSfx" type="checkbox" checked />
           </label>
+          <label class="input-row">
+            <span>SFX Kit</span>
+            <select id="settingSfxKit">
+              <option value="01_lighthouse_clean">01 Lighthouse Clean</option>
+              <option value="02_dark_ocean">02 Dark Ocean</option>
+              <option value="03_crystal_arcade">03 Crystal Arcade</option>
+              <option value="04_premium_cinematic">04 Premium Cinematic</option>
+              <option value="05_minimal_soft">05 Minimal Soft</option>
+            </select>
+          </label>
           <label class="toggle-row">
             <span>Animations</span>
             <input id="settingAnimations" type="checkbox" checked />
@@ -292,6 +302,6 @@
       </div>
     </section>
 
-    <script type="module" src="./src/presentation/browser/main.js?v=0.1.23"></script>
+    <script type="module" src="./src/presentation/browser/main.js?v=0.1.24"></script>
   </body>
 </html>
