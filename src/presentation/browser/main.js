@@ -2,10 +2,11 @@ import { Bonus, Owner, Turn, VictoryMode } from "../../core/constants.js";
 import { createGame, getSnapshot, restart, runAiTurnWithTrace, runComputerTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
 import { MockRewardedAdProvider, RewardedAdStatus } from "./rewardedAds.js";
 
-const APP_VERSION = "0.1.24";
+const APP_VERSION = "0.1.25";
 const PROGRESS_STORAGE_KEY = "crystalFrontProgressV1";
 const PREFERENCES_STORAGE_KEY = "crystalFrontPreferencesV1";
 const ANALYTICS_STORAGE_KEY = "crystalFrontAnalyticsV1";
+const SPLASH_DURATION_MS = 10_000;
 const SFX_ROOT = "./assets/generated/audio/core-sfx-kits-v1";
 const AUDIO_ASSETS = Object.freeze({
   studioSplash: "./assets/runtime/audio/studio-splash.mp3",
@@ -55,6 +56,7 @@ let uiPreferences = loadPersistedPreferences();
 let currentMatchFinalized = false;
 let audioController = createAudioController();
 let lastResultSoundKey = null;
+let splashTimer = null;
 
 const shopItems = [
   { bonus: Bonus.Bomb, label: "Bomb", detail: "Clears a 3x3 strike zone.", cost: 35 },
@@ -155,13 +157,7 @@ const els = {
 
 render();
 playStudioSplash();
-window.setTimeout(() => {
-  if (appView === "splash") {
-    appView = pendingViewAfterSplash;
-    render();
-    if (appView === "nickname") els.nicknameInput.focus();
-  }
-}, 1800);
+splashTimer = window.setTimeout(() => finishSplash(), SPLASH_DURATION_MS);
 
 els.board.addEventListener("click", async (event) => {
   if (isAnimating || appView !== "battle") return;
@@ -242,6 +238,10 @@ document.addEventListener("click", (event) => {
 });
 
 document.addEventListener("pointerdown", (event) => {
+  if (appView === "splash") {
+    finishSplash();
+    return;
+  }
   audioController.unlock();
   const button = event.target.closest("button");
   if (!button || button.disabled) return;
@@ -1073,6 +1073,16 @@ function playStudioSplash() {
   audioController.play("studioSplash");
 }
 
+function finishSplash() {
+  if (appView !== "splash") return;
+  window.clearTimeout(splashTimer);
+  splashTimer = null;
+  audioController.stop("studioSplash");
+  appView = pendingViewAfterSplash;
+  render();
+  if (appView === "nickname") els.nicknameInput.focus();
+}
+
 function playSfx(name) {
   audioController.play(name);
 }
@@ -1174,7 +1184,17 @@ function createAudioController() {
     queued.forEach((name) => play(name));
   }
 
-  return { play, unlock };
+  function stop(name) {
+    const source = getAudioSource(name);
+    if (!source) return;
+    blockedQueue.delete(name);
+    const audio = cache.get(source);
+    if (!audio) return;
+    audio.pause();
+    audio.currentTime = 0;
+  }
+
+  return { play, unlock, stop };
 }
 
 function getAudioSource(name) {

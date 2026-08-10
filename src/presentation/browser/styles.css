@@ -979,7 +979,7 @@ body.is-ai-duel .bonus-icon {
   background:
     radial-gradient(ellipse at 50% 40%, rgba(237, 198, 109, 0.16), transparent 34%),
     linear-gradient(180deg, rgba(3, 8, 16, 0.96), rgba(1, 4, 9, 0.98));
-  animation: studio-splash-fade 1800ms ease forwards;
+  animation: studio-splash-fade 10000ms ease forwards;
 }
 
 .studio-splash-mark {
@@ -988,7 +988,7 @@ body.is-ai-duel .bonus-icon {
   place-items: center;
   filter: drop-shadow(0 22px 34px rgba(0, 0, 0, 0.54));
   transform-origin: center;
-  animation: studio-mark-rise 1600ms ease forwards;
+  animation: studio-mark-rise 9200ms ease forwards;
 }
 
 .studio-splash-mark img {
@@ -1209,7 +1209,7 @@ body.is-ai-duel .bonus-icon {
 
 @keyframes studio-splash-fade {
   0%,
-  72% {
+  86% {
     opacity: 1;
   }
 
@@ -1224,8 +1224,8 @@ body.is-ai-duel .bonus-icon {
     transform: translateY(14px) scale(0.96);
   }
 
-  26%,
-  78% {
+  8%,
+  82% {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
