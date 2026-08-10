@@ -2,7 +2,7 @@ import { Bonus, Owner, Turn, VictoryMode } from "../../core/constants.js";
 import { createGame, getSnapshot, restart, runAiTurnWithTrace, runComputerTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
 import { MockRewardedAdProvider, RewardedAdStatus } from "./rewardedAds.js";
 
-const APP_VERSION = "0.1.26";
+const APP_VERSION = "0.1.27";
 const PROGRESS_STORAGE_KEY = "crystalFrontProgressV1";
 const PREFERENCES_STORAGE_KEY = "crystalFrontPreferencesV1";
 const ANALYTICS_STORAGE_KEY = "crystalFrontAnalyticsV1";
@@ -57,6 +57,7 @@ let currentMatchFinalized = false;
 let audioController = createAudioController();
 let lastResultSoundKey = null;
 let splashTimer = null;
+let splashStarted = false;
 
 const shopItems = [
   { bonus: Bonus.Bomb, label: "Bomb", detail: "Clears a 3x3 strike zone.", cost: 35 },
@@ -109,6 +110,7 @@ const els = {
   pauseButton: document.querySelector("#pauseButton"),
   mainMenu: document.querySelector("#mainMenu"),
   studioSplash: document.querySelector("#studioSplash"),
+  splashStartButton: document.querySelector("#splashStartButton"),
   nicknameMenu: document.querySelector("#nicknameMenu"),
   nicknameForm: document.querySelector("#nicknameForm"),
   nicknameInput: document.querySelector("#nicknameInput"),
@@ -156,8 +158,6 @@ const els = {
 };
 
 render();
-playStudioSplash();
-splashTimer = window.setTimeout(() => finishSplash(), SPLASH_DURATION_MS);
 
 els.board.addEventListener("click", async (event) => {
   if (isAnimating || appView !== "battle") return;
@@ -239,7 +239,11 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("pointerdown", (event) => {
   if (appView === "splash") {
-    finishSplash();
+    if (!splashStarted) {
+      startSplashExperience();
+    } else if (!event.target.closest("#splashStartButton")) {
+      finishSplash();
+    }
     return;
   }
   audioController.unlock();
@@ -436,6 +440,7 @@ function updateScreens(snapshot) {
   document.body.dataset.view = appView;
   els.mainMenu.hidden = appView !== "main";
   els.studioSplash.hidden = appView !== "splash";
+  els.studioSplash.classList.toggle("is-started", splashStarted);
   els.nicknameMenu.hidden = appView !== "nickname";
   els.setupMenu.hidden = appView !== "setup";
   els.shopMenu.hidden = appView !== "shop";
@@ -1071,6 +1076,15 @@ function showToast(message) {
 
 function playStudioSplash() {
   audioController.play("studioSplash", { queueOnBlock: false });
+}
+
+function startSplashExperience() {
+  if (splashStarted || appView !== "splash") return;
+  splashStarted = true;
+  els.studioSplash.classList.add("is-started");
+  audioController.unlock();
+  playStudioSplash();
+  splashTimer = window.setTimeout(() => finishSplash(), SPLASH_DURATION_MS);
 }
 
 function finishSplash() {

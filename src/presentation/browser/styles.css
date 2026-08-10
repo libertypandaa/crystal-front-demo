@@ -976,6 +976,7 @@ body.is-ai-duel .bonus-icon {
 
 .studio-splash {
   z-index: 30;
+  gap: 22px;
   background:
     radial-gradient(ellipse at 50% 40%, rgba(237, 198, 109, 0.16), transparent 34%),
     linear-gradient(180deg, rgba(3, 8, 16, 0.96), rgba(1, 4, 9, 0.98));
@@ -987,6 +988,9 @@ body.is-ai-duel .bonus-icon {
   place-items: center;
   filter: drop-shadow(0 22px 34px rgba(0, 0, 0, 0.54));
   transform-origin: center;
+}
+
+.studio-splash.is-started .studio-splash-mark {
   animation: studio-mark-rise 9200ms ease forwards;
 }
 
@@ -997,6 +1001,35 @@ body.is-ai-duel .bonus-icon {
   border: 1px solid rgba(237, 198, 109, 0.34);
   border-radius: 7px;
   box-shadow: 0 0 34px rgba(237, 198, 109, 0.16), 0 0 56px rgba(36, 184, 255, 0.08);
+}
+
+.splash-start-button {
+  min-width: min(76vw, 260px);
+  min-height: 54px;
+  cursor: pointer;
+  border: 1px solid rgba(237, 198, 109, 0.58);
+  border-radius: var(--radius-button);
+  background:
+    linear-gradient(180deg, rgba(237, 198, 109, 0.24), rgba(25, 170, 245, 0.08)),
+    rgba(4, 9, 18, 0.86);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: clamp(1rem, 3.8vw, 1.2rem);
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  box-shadow: 0 0 28px rgba(237, 198, 109, 0.16), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  transition: opacity 220ms ease, transform 220ms ease, box-shadow 220ms ease;
+}
+
+.splash-start-button:active {
+  transform: scale(0.97);
+  box-shadow: 0 0 34px rgba(57, 217, 255, 0.24), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.studio-splash.is-started .splash-start-button {
+  opacity: 0;
+  transform: translateY(8px) scale(0.96);
+  pointer-events: none;
 }
 
 .menu-panel,
