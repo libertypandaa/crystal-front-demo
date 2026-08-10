@@ -2,7 +2,7 @@ import { Bonus, Owner, Turn, VictoryMode } from "../../core/constants.js";
 import { createGame, getSnapshot, restart, runAiTurnWithTrace, runComputerTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
 import { MockRewardedAdProvider, RewardedAdStatus } from "./rewardedAds.js";
 
-const APP_VERSION = "0.1.25";
+const APP_VERSION = "0.1.26";
 const PROGRESS_STORAGE_KEY = "crystalFrontProgressV1";
 const PREFERENCES_STORAGE_KEY = "crystalFrontPreferencesV1";
 const ANALYTICS_STORAGE_KEY = "crystalFrontAnalyticsV1";
@@ -1070,7 +1070,7 @@ function showToast(message) {
 }
 
 function playStudioSplash() {
-  audioController.play("studioSplash");
+  audioController.play("studioSplash", { queueOnBlock: false });
 }
 
 function finishSplash() {
@@ -1164,7 +1164,7 @@ function createAudioController() {
     return cache.get(source);
   }
 
-  async function play(name) {
+  async function play(name, options = {}) {
     if (!canPlay()) return;
     const audio = getAudio(name);
     if (!audio) return;
@@ -1173,7 +1173,7 @@ function createAudioController() {
       await audio.play();
       blockedQueue.delete(name);
     } catch {
-      blockedQueue.add(name);
+      if (options.queueOnBlock !== false) blockedQueue.add(name);
     }
   }
 

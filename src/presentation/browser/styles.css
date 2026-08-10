@@ -979,7 +979,6 @@ body.is-ai-duel .bonus-icon {
   background:
     radial-gradient(ellipse at 50% 40%, rgba(237, 198, 109, 0.16), transparent 34%),
     linear-gradient(180deg, rgba(3, 8, 16, 0.96), rgba(1, 4, 9, 0.98));
-  animation: studio-splash-fade 10000ms ease forwards;
 }
 
 .studio-splash-mark {
@@ -1204,17 +1203,6 @@ body.is-ai-duel .bonus-icon {
   100% {
     opacity: 0;
     transform: translate(-50%, -50%) scale(22);
-  }
-}
-
-@keyframes studio-splash-fade {
-  0%,
-  86% {
-    opacity: 1;
-  }
-
-  100% {
-    opacity: 0;
   }
 }
 
