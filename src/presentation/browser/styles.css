@@ -43,6 +43,7 @@ html,
 body {
   width: 100%;
   height: 100%;
+  min-height: 100%;
   margin: 0;
   overflow: hidden;
   background:
@@ -120,8 +121,11 @@ button:focus-visible {
   grid-template-rows: minmax(82px, 0.72fr) repeat(2, minmax(0, 1.42fr)) minmax(104px, 0.92fr) minmax(82px, 0.72fr);
   gap: var(--gap);
   width: min(100vw, 520px);
+  height: 100vh;
   height: 100svh;
-  min-height: 620px;
+  height: 100dvh;
+  max-height: 100%;
+  min-height: 0;
   margin: 0 auto;
   padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right))
     max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
@@ -294,7 +298,7 @@ button:focus-visible {
 .board-wrap {
   position: relative;
   display: grid;
-  width: min(94vw, 100%, 44svh);
+  width: min(94vw, 100%, 52svh);
   aspect-ratio: 1;
   place-items: center;
   padding: clamp(7px, 1.35vw, 11px);
@@ -470,6 +474,15 @@ button:focus-visible {
 
 .cell.is-swapping {
   animation: cell-pulse 700ms ease;
+}
+
+.cell.is-ai-thinking {
+  animation: ai-pick-scan 900ms ease-in-out infinite;
+  border-color: rgba(237, 198, 109, 0.9);
+  box-shadow:
+    0 0 0 2px rgba(237, 198, 109, 0.26),
+    0 0 20px rgba(237, 198, 109, 0.48),
+    inset 0 0 20px rgba(255, 255, 255, 0.08);
 }
 
 .cell.is-swap-from {
@@ -706,7 +719,9 @@ body.is-ai-duel .bonus-icon {
 .bonus-card {
   position: relative;
   display: flex;
+  height: 100%;
   min-width: 0;
+  min-height: 0;
   align-items: center;
   justify-content: center;
   flex-direction: column;
@@ -965,6 +980,7 @@ body.is-ai-duel .bonus-icon {
   place-items: center;
   padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right))
     max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  overflow: auto;
   background:
     linear-gradient(180deg, rgba(5, 12, 24, 0.72), rgba(3, 8, 16, 0.92)),
     radial-gradient(circle at 50% 42%, rgba(25, 170, 245, 0.18), transparent 34%);
@@ -991,7 +1007,7 @@ body.is-ai-duel .bonus-icon {
 }
 
 .studio-splash.is-started .studio-splash-mark {
-  animation: studio-mark-rise 9200ms ease forwards;
+  animation: studio-mark-rise 4800ms ease forwards;
 }
 
 .studio-splash-mark img {
@@ -1044,12 +1060,18 @@ body.is-ai-duel .bonus-icon {
 }
 
 .menu-panel {
+  max-height: calc(100vh - 28px);
   max-height: calc(100svh - 28px);
+  max-height: calc(100dvh - 28px);
   overflow: auto;
   padding: clamp(18px, 4svh, 28px);
 }
 
 .modal-panel {
+  max-height: calc(100vh - 28px);
+  max-height: calc(100svh - 28px);
+  max-height: calc(100dvh - 28px);
+  overflow: auto;
   padding: clamp(16px, 3svh, 24px);
 }
 
@@ -1058,7 +1080,9 @@ body.is-ai-duel .bonus-icon {
 }
 
 .menu-scroll-panel {
+  max-height: calc(100vh - 28px);
   max-height: calc(100svh - 28px);
+  max-height: calc(100dvh - 28px);
   overflow: auto;
 }
 
@@ -1241,8 +1265,8 @@ body.is-ai-duel .bonus-icon {
 
 @keyframes studio-mark-rise {
   0% {
-    opacity: 0;
-    transform: translateY(14px) scale(0.96);
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 
   8%,
@@ -1339,6 +1363,10 @@ body.is-ai-duel .bonus-icon {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-button);
   background: rgba(255, 255, 255, 0.035);
+}
+
+.control-row.is-hidden {
+  display: none;
 }
 
 .control-row span {
@@ -1458,6 +1486,74 @@ body.is-ai-duel .bonus-icon {
 
 .shop-reward {
   border-color: rgba(57, 217, 255, 0.45);
+}
+
+.test-ad-overlay {
+  z-index: 40;
+  background:
+    radial-gradient(ellipse at 50% 20%, rgba(237, 198, 109, 0.18), transparent 32%),
+    linear-gradient(180deg, rgba(2, 6, 12, 0.92), rgba(2, 5, 10, 0.98));
+}
+
+.test-ad-panel {
+  display: grid;
+  width: min(86vw, 360px);
+  gap: 12px;
+  place-items: center;
+  padding: 24px;
+  border: 1px solid rgba(237, 198, 109, 0.54);
+  border-radius: var(--radius-panel);
+  background:
+    radial-gradient(circle at 50% 16%, rgba(255, 230, 150, 0.16), transparent 32%),
+    linear-gradient(180deg, rgba(18, 34, 55, 0.96), rgba(4, 9, 18, 0.98));
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.54), 0 0 36px rgba(237, 198, 109, 0.12);
+  text-align: center;
+}
+
+.test-ad-panel span {
+  color: var(--gold);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.test-ad-panel strong {
+  font-size: clamp(1.8rem, 8vw, 2.6rem);
+  line-height: 1;
+}
+
+.test-ad-panel p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.test-ad-panel b {
+  display: grid;
+  width: 44px;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(57, 217, 255, 0.42);
+  border-radius: 50%;
+  color: var(--gold);
+  background: rgba(4, 9, 18, 0.72);
+}
+
+.test-ad-progress {
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.test-ad-progress i {
+  display: block;
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--player), var(--gold));
+  box-shadow: 0 0 14px rgba(237, 198, 109, 0.44);
+  transition: width 140ms linear;
 }
 
 .shop-pack {
@@ -1717,6 +1813,19 @@ body.is-ai-duel .bonus-icon {
   }
 }
 
+@keyframes ai-pick-scan {
+  0%,
+  100% {
+    filter: brightness(1);
+    transform: scale(1);
+  }
+
+  50% {
+    filter: brightness(1.32);
+    transform: scale(1.055);
+  }
+}
+
 @keyframes swap-cell-flash {
   0%,
   100% {
@@ -1903,6 +2012,16 @@ body.is-ai-duel .bonus-icon {
 }
 
 @media (max-height: 700px) {
+  :root {
+    --gap: clamp(4px, 0.8svh, 8px);
+  }
+
+  .game-shell {
+    grid-template-rows: minmax(62px, 0.66fr) repeat(2, minmax(0, 1.58fr)) minmax(78px, 0.82fr) minmax(58px, 0.6fr);
+    padding: max(4px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right))
+      max(4px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+  }
+
   .duelist strong {
     font-size: clamp(1.2rem, 6vw, 2rem);
   }
@@ -1914,5 +2033,135 @@ body.is-ai-duel .bonus-icon {
   .micro-chip {
     min-height: 20px;
     margin-top: 3px;
+  }
+
+  .board-wrap {
+    width: min(96vw, 100%, 56svh);
+    padding: 6px;
+  }
+
+  .bonus-card {
+    gap: 2px;
+    padding: 5px;
+  }
+
+  .bonus-icon {
+    width: min(10svh, 44px);
+  }
+
+  .zone-system {
+    grid-template-columns: minmax(48px, 0.64fr) minmax(74px, 0.9fr) minmax(82px, 1fr) minmax(58px, 0.72fr);
+    padding: 6px;
+  }
+
+  .dock-button,
+  .system-card {
+    height: min(100%, 50px);
+  }
+}
+
+@media (max-height: 560px) {
+  .game-shell {
+    grid-template-rows: minmax(50px, 0.58fr) repeat(2, minmax(0, 1.7fr)) minmax(60px, 0.7fr) minmax(48px, 0.52fr);
+  }
+
+  .duelist {
+    padding: 6px;
+  }
+
+  .duelist::before,
+  .micro-chip {
+    display: none;
+  }
+
+  .turn-core {
+    padding: 5px;
+  }
+
+  .board-wrap {
+    width: min(97vw, 100%, 60svh);
+    padding: 5px;
+  }
+
+  .bonus-card strong {
+    font-size: 0.56rem;
+  }
+
+  .bonus-card span:last-child {
+    font-size: 0.9rem;
+  }
+
+  .zone-bonuses {
+    overflow: hidden;
+  }
+
+  .bonus-card {
+    gap: 1px;
+    padding: 3px;
+  }
+
+  .bonus-icon {
+    width: min(7svh, 30px);
+    border-width: 0;
+  }
+
+  .bonus-card::before {
+    inset: 2px;
+  }
+
+  .zone-system {
+    padding: 4px;
+  }
+
+  .dock-button,
+  .system-card {
+    height: min(100%, 42px);
+  }
+
+  .system-card {
+    padding: 3px;
+  }
+
+  .system-card span {
+    font-size: 0.58rem;
+  }
+
+  .system-card strong {
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  .version {
+    font-size: 0.62rem;
+  }
+
+  .screen-layer {
+    align-items: start;
+    padding-block: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-bottom));
+  }
+
+  .menu-panel,
+  .modal-panel {
+    gap: 7px;
+    max-height: calc(100dvh - 16px);
+    padding: 10px;
+  }
+
+  .menu-header h1,
+  .modal-header h2 {
+    font-size: clamp(1.72rem, 8vw, 2.35rem);
+  }
+
+  .menu-actions {
+    gap: 6px;
+  }
+
+  .menu-button {
+    min-height: 38px;
+    font-size: 0.82rem;
+  }
+
+  .menu-footer {
+    font-size: 0.7rem;
   }
 }

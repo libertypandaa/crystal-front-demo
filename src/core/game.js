@@ -74,14 +74,16 @@ export function runComputerTurnWithTrace(state, actor = state.turn === Turn.Play
     .map((swap) => ({ swap, preview: previewMoveWithCascade(state.cells, swap, actor) }))
     .sort((a, b) => b.preview.score - a.preview.score);
 
-  const weighted = weightAiMoves(rated, state.settings.aiDifficulty);
+  const effectiveDifficulty = getActorDifficulty(state, actor);
+  const weighted = weightAiMoves(rated, effectiveDifficulty);
   const choiceIndex = chooseWeightedIndex(weighted, Math.random);
   const choice = rated[choiceIndex] ?? rated[0];
 
-  return submitSwapTurn(state, choice.swap.from, choice.swap.to, actor, {
+  const result = submitSwapTurn(state, choice.swap.from, choice.swap.to, actor, {
     aiDecision: {
-      difficulty: state.settings.aiDifficulty,
-      bias: getAiDifficultyBias(state.settings.aiDifficulty),
+      difficulty: effectiveDifficulty,
+      baseDifficulty: state.settings.aiDifficulty,
+      bias: getAiDifficultyBias(effectiveDifficulty),
       choiceRank: choiceIndex + 1,
       choiceWeight: Number(weighted[choiceIndex].weight.toFixed(4)),
       consideredMoves: rated.length,
@@ -89,6 +91,24 @@ export function runComputerTurnWithTrace(state, actor = state.turn === Turn.Play
       preview: choice.preview,
     },
   });
+  return {
+    state: result.state,
+    trace: [
+      {
+        type: "decision",
+        actor,
+        movableOwner: getMovableOwner(actor),
+        from: choice.swap.from,
+        to: choice.swap.to,
+        choiceRank: choiceIndex + 1,
+        consideredMoves: rated.length,
+        score: choice.preview.score,
+        cells: cloneCells(state.cells),
+        message: "AI selects a strike.",
+      },
+      ...result.trace,
+    ],
+  };
 }
 
 export function restart(state) {
@@ -521,6 +541,7 @@ function recordAcceptedMove(state, actor, trace, scoreGain, cascades, resultingS
         resultingScores: { ...resultingScores },
         aiDecision: aiDecision ? {
           difficulty: aiDecision.difficulty,
+          baseDifficulty: aiDecision.baseDifficulty,
           bias: aiDecision.bias,
           choiceRank: aiDecision.choiceRank,
           choiceWeight: aiDecision.choiceWeight,
@@ -561,4 +582,10 @@ function getMovableOwner(actor) {
   if (actor === Owner.Player) return Owner.AI;
   if (actor === Owner.AI) return Owner.Player;
   return actor;
+}
+
+function getActorDifficulty(state, actor) {
+  const base = Number(state.settings.aiDifficulty) || 50;
+  if (state.settings.victoryMode !== VictoryMode.AiDuel) return base;
+  return Math.max(1, Math.min(100, Math.round(actor === Owner.Player ? base - 8 : base + 8)));
 }

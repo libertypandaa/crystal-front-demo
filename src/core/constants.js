@@ -33,7 +33,7 @@ export const VictoryMode = Object.freeze({
 });
 
 export const DEFAULT_SETTINGS = Object.freeze({
-  targetScore: 1000,
+  targetScore: 50,
   aiDifficulty: 62,
   victoryMode: VictoryMode.TargetScore,
 });

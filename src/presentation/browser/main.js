@@ -2,11 +2,11 @@ import { Bonus, Owner, Turn, VictoryMode } from "../../core/constants.js";
 import { createGame, getSnapshot, restart, runAiTurnWithTrace, runComputerTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
 import { MockRewardedAdProvider, RewardedAdStatus } from "./rewardedAds.js";
 
-const APP_VERSION = "0.1.27";
+const APP_VERSION = "0.1.30";
 const PROGRESS_STORAGE_KEY = "crystalFrontProgressV1";
 const PREFERENCES_STORAGE_KEY = "crystalFrontPreferencesV1";
 const ANALYTICS_STORAGE_KEY = "crystalFrontAnalyticsV1";
-const SPLASH_DURATION_MS = 10_000;
+const SPLASH_DURATION_MS = 5_000;
 const SFX_ROOT = "./assets/generated/audio/core-sfx-kits-v1";
 const AUDIO_ASSETS = Object.freeze({
   studioSplash: "./assets/runtime/audio/studio-splash.mp3",
@@ -39,7 +39,6 @@ const DEFAULT_PREFERENCES = Object.freeze({
   sfx: true,
   sfxKit: "01_lighthouse_clean",
   animations: true,
-  motion: 100,
 });
 
 const persistedProgress = loadPersistedProgress();
@@ -77,11 +76,16 @@ let shopState = {
 };
 const rewardedAds = new MockRewardedAdProvider();
 
-const rivals = [
-  { name: "North Prism", rating: 1380, record: "18-7" },
-  { name: "Rose Shard", rating: 1315, record: "15-8" },
-  { name: "Glass Warden", rating: 1260, record: "12-9" },
-  { name: "Mint Oracle", rating: 1120, record: "8-11" },
+const localRivals = [
+  { name: "North Prism", rating: 1280, record: "9-3-1" },
+  { name: "Rose Shard", rating: 1265, record: "8-4-0" },
+  { name: "Glass Warden", rating: 1240, record: "7-5-1" },
+  { name: "Azure Vale", rating: 1225, record: "6-4-2" },
+  { name: "Mint Oracle", rating: 1210, record: "6-6-0" },
+  { name: "Cinder Ray", rating: 1190, record: "5-6-1" },
+  { name: "Lumen Forge", rating: 1175, record: "4-6-2" },
+  { name: "Violet Tide", rating: 1160, record: "4-7-0" },
+  { name: "Dawn Lattice", rating: 1145, record: "3-7-1" },
 ];
 
 window.crystalFrontDebug = {
@@ -110,7 +114,9 @@ const els = {
   pauseButton: document.querySelector("#pauseButton"),
   mainMenu: document.querySelector("#mainMenu"),
   studioSplash: document.querySelector("#studioSplash"),
-  splashStartButton: document.querySelector("#splashStartButton"),
+  testAdOverlay: document.querySelector("#testAdOverlay"),
+  testAdProgress: document.querySelector("#testAdProgress"),
+  testAdCountdown: document.querySelector("#testAdCountdown"),
   nicknameMenu: document.querySelector("#nicknameMenu"),
   nicknameForm: document.querySelector("#nicknameForm"),
   nicknameInput: document.querySelector("#nicknameInput"),
@@ -144,8 +150,6 @@ const els = {
   settingSfx: document.querySelector("#settingSfx"),
   settingSfxKit: document.querySelector("#settingSfxKit"),
   settingAnimations: document.querySelector("#settingAnimations"),
-  settingMotion: document.querySelector("#settingMotion"),
-  settingMotionValue: document.querySelector("#settingMotionValue"),
   settingsNickname: document.querySelector("#settingsNickname"),
   duelAssistPanel: document.querySelector("#duelAssistPanel"),
   duelSpeedSlider: document.querySelector("#duelSpeedSlider"),
@@ -158,6 +162,7 @@ const els = {
 };
 
 render();
+startSplashExperience();
 
 els.board.addEventListener("click", async (event) => {
   if (isAnimating || appView !== "battle") return;
@@ -239,11 +244,7 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("pointerdown", (event) => {
   if (appView === "splash") {
-    if (!splashStarted) {
-      startSplashExperience();
-    } else if (!event.target.closest("#splashStartButton")) {
-      finishSplash();
-    }
+    finishSplash();
     return;
   }
   audioController.unlock();
@@ -312,7 +313,6 @@ els.settingSound.addEventListener("change", () => updatePreference("sound", els.
 els.settingSfx.addEventListener("change", () => updatePreference("sfx", els.settingSfx.checked));
 els.settingSfxKit.addEventListener("change", () => updatePreference("sfxKit", els.settingSfxKit.value));
 els.settingAnimations.addEventListener("change", () => updatePreference("animations", els.settingAnimations.checked));
-els.settingMotion.addEventListener("input", () => updatePreference("motion", Number(els.settingMotion.value)));
 els.nicknameForm.addEventListener("submit", (event) => {
   event.preventDefault();
   saveNickname(els.nicknameInput.value, "main");
@@ -341,14 +341,14 @@ function handleMenuAction(action, sourceButton) {
 
 async function maybeRunAi() {
   if (appView !== "battle" || state.turn !== Turn.AI || state.winner) return;
-  await wait(520);
+  await wait(420);
   if (appView !== "battle") return;
   await commitAnimatedTurn(runAiTurnWithTrace(state));
 }
 
 async function maybeRunAiDuel() {
   if (appView !== "battle" || state.winner || state.settings.victoryMode !== VictoryMode.AiDuel || state.turn === Turn.Ended || isAnimating || state.selectedBonus) return;
-  await wait(620 / getDuelSpeed());
+  await wait(420 / Math.max(0.35, getDuelSpeed()));
   if (appView !== "battle" || state.winner || state.settings.victoryMode !== VictoryMode.AiDuel || isAnimating || state.selectedBonus) return;
   await commitAnimatedTurn(runComputerTurnWithTrace(state, state.turn === Turn.Player ? Owner.Player : Owner.AI));
   await maybeRunAiDuel();
@@ -361,7 +361,7 @@ async function commitAnimatedTurn(result) {
   for (const phase of result.trace) {
     playPhaseSound(phase);
     if (phase.cells) render(makeSnapshot(phase.cells), phase);
-    await wait(getPhaseDuration(phase) / getDuelAnimationSpeed());
+    await wait(getAnimatedPhaseDuration(phase));
   }
 
   state = result.state;
@@ -389,15 +389,18 @@ function render(snapshot = getSnapshot(state), phase = null) {
   els.aiScore.textContent = snapshot.scores.ai;
   els.turnNumber.textContent = snapshot.turnNumber;
   els.turnOwner.textContent = formatTurn(snapshot);
-  els.playerName.textContent = snapshot.settings.victoryMode === VictoryMode.AiDuel ? "BLUE AI" : snapshot.profile.nickname;
-  els.aiName.textContent = snapshot.settings.victoryMode === VictoryMode.AiDuel ? "RED AI" : "RIVAL";
-  els.aiDifficulty.textContent = `AI ${snapshot.settings.aiDifficulty}`;
-  els.playerRating.textContent = snapshot.settings.victoryMode === VictoryMode.AiDuel ? `AI ${snapshot.settings.aiDifficulty}` : `Rating ${snapshot.profile.rating}`;
+  const blueAi = getAiPersona(getActorDifficulty(snapshot, Owner.Player), Owner.Player);
+  const redAi = getAiPersona(getActorDifficulty(snapshot, Owner.AI), Owner.AI);
+  els.playerName.textContent = snapshot.settings.victoryMode === VictoryMode.AiDuel ? blueAi.name : snapshot.profile.nickname;
+  els.aiName.textContent = snapshot.settings.victoryMode === VictoryMode.AiDuel ? redAi.name : "RIVAL";
+  els.aiDifficulty.textContent = snapshot.settings.victoryMode === VictoryMode.AiDuel ? `AI ${redAi.difficulty}` : `AI ${snapshot.settings.aiDifficulty}`;
+  els.playerRating.textContent = snapshot.settings.victoryMode === VictoryMode.AiDuel ? `AI ${blueAi.difficulty}` : `Rating ${snapshot.profile.rating}`;
   els.targetScore.textContent = snapshot.settings.victoryMode === VictoryMode.TargetScore
     ? snapshot.settings.targetScore
     : snapshot.settings.victoryMode === VictoryMode.LastMove
       ? "LAST"
       : "DUEL";
+  els.targetScore.closest(".system-card").hidden = snapshot.settings.victoryMode !== VictoryMode.TargetScore;
 
   for (const bonus of Object.values(Bonus)) {
     const count = document.querySelector(`#bonus-${bonus}`);
@@ -516,6 +519,18 @@ function openMainMenu() {
   render();
 }
 
+async function closeNativeApp() {
+  try {
+    const appPlugin = window.Capacitor?.Plugins?.App;
+    if (!appPlugin?.exitApp) throw new Error("Native App plugin is unavailable.");
+    await appPlugin.exitApp();
+  } catch {
+    appView = "main";
+    showToast("Use the system Back button to close the app.");
+    render();
+  }
+}
+
 function openSetupMenu() {
   pendingSettings = { ...state.settings };
   setupReturnView = appView === "result" ? "result" : "main";
@@ -545,17 +560,19 @@ function closeSetupMenu() {
 }
 
 function exitGame() {
-  appView = "exit";
-  window.close();
-  render();
+  closeNativeApp();
 }
 
 function renderSetupValues() {
+  const isTargetMode = pendingSettings.victoryMode === VictoryMode.TargetScore;
   els.setupAiDifficulty.value = String(pendingSettings.aiDifficulty);
   els.setupAiValue.textContent = pendingSettings.aiDifficulty;
   els.setupTargetScore.value = String(pendingSettings.targetScore);
   els.setupTargetValue.textContent = pendingSettings.targetScore;
-  els.setupTargetRow.hidden = pendingSettings.victoryMode !== VictoryMode.TargetScore;
+  els.setupTargetRow.hidden = !isTargetMode;
+  els.setupTargetRow.classList.toggle("is-hidden", !isTargetMode);
+  els.setupTargetRow.setAttribute("aria-hidden", String(!isTargetMode));
+  els.setupTargetScore.disabled = !isTargetMode;
   els.victoryModeButtons.forEach((button) => {
     button.classList.toggle("is-selected", button.dataset.victoryMode === pendingSettings.victoryMode);
   });
@@ -644,14 +661,16 @@ function renderLeaderboard(snapshot) {
   els.ratingBest.textContent = `${snapshot.profile.wins}-${snapshot.profile.losses}-${snapshot.profile.draws}`;
 
   const rows = [
-    ...rivals,
+    ...localRivals,
     {
       name: snapshot.profile.nickname,
       rating: snapshot.profile.rating,
       record: `${snapshot.profile.wins}-${snapshot.profile.losses}-${snapshot.profile.draws}`,
       player: true,
     },
-  ].sort((a, b) => b.rating - a.rating);
+  ]
+    .sort((a, b) => b.rating - a.rating)
+    .slice(0, 10);
 
   els.leaderboardList.innerHTML = "";
   rows.forEach((row, index) => {
@@ -673,9 +692,7 @@ function renderSettings() {
   els.settingSfx.checked = uiPreferences.sfx;
   els.settingSfxKit.value = uiPreferences.sfxKit;
   els.settingAnimations.checked = uiPreferences.animations;
-  els.settingMotion.value = String(uiPreferences.motion);
-  els.settingMotionValue.textContent = `${uiPreferences.motion}%`;
-  document.body.classList.toggle("reduce-ui-motion", !uiPreferences.animations || uiPreferences.motion === 0);
+  document.body.classList.toggle("reduce-ui-motion", !uiPreferences.animations);
 }
 
 function renderDuelAssist(snapshot = getSnapshot(state)) {
@@ -691,11 +708,7 @@ function getDuelSpeed() {
 }
 
 function formatSpeed(speed) {
-  return Number.isInteger(speed) ? String(speed) : String(speed);
-}
-
-function getDuelAnimationSpeed() {
-  return state.settings.victoryMode === VictoryMode.AiDuel ? getDuelSpeed() : 1;
+  return speed >= 1 ? speed.toFixed(1).replace(/\.0$/, "") : speed.toFixed(2).replace(/0$/, "");
 }
 
 function updatePreference(key, value) {
@@ -783,10 +796,14 @@ async function claimAdReward() {
     return;
   }
 
-  showToast("Showing rewarded ad...");
   isClaimingAdReward = true;
+  shopState = { ...shopState, lastAdClaimAt: now };
+  persistProgress();
   render();
-  const result = await rewardedAds.show();
+  const result = await rewardedAds.show({
+    onProgress: (progress) => renderTestAd(progress),
+  });
+  hideTestAd();
   isClaimingAdReward = false;
   if (result.status !== RewardedAdStatus.Rewarded) {
     showToast(result.message || "Rewarded ad is unavailable.");
@@ -794,7 +811,6 @@ async function claimAdReward() {
     return;
   }
 
-  shopState = { ...shopState, lastAdClaimAt: now };
   state = {
     ...state,
     profile: {
@@ -970,7 +986,6 @@ function sanitizePreferences(preferences = {}) {
     sfx: typeof source.sfx === "boolean" ? source.sfx : DEFAULT_PREFERENCES.sfx,
     sfxKit: SFX_KITS.includes(source.sfxKit) ? source.sfxKit : DEFAULT_PREFERENCES.sfxKit,
     animations: typeof source.animations === "boolean" ? source.animations : DEFAULT_PREFERENCES.animations,
-    motion: Math.max(0, Math.min(100, sanitizeNumber(source.motion, DEFAULT_PREFERENCES.motion))),
   };
 }
 
@@ -1055,9 +1070,12 @@ function formatTurn(snapshot) {
   if (snapshot.winner === Owner.AI) return "Defeat";
   if (snapshot.winner === "draw") return "Draw";
   if (snapshot.settings.victoryMode === VictoryMode.AiDuel) {
+    const persona = snapshot.turn === Turn.Player
+      ? getAiPersona(getActorDifficulty(snapshot, Owner.Player), Owner.Player)
+      : getAiPersona(getActorDifficulty(snapshot, Owner.AI), Owner.AI);
     return snapshot.turn === Turn.Player
-      ? `Blue AI - ${snapshot.playableMoves.player} options`
-      : `Red AI - ${snapshot.playableMoves.ai} options`;
+      ? `${persona.name} - ${snapshot.playableMoves.player} options`
+      : `${persona.name} - ${snapshot.playableMoves.ai} options`;
   }
   if (snapshot.settings.victoryMode === VictoryMode.LastMove) {
     return snapshot.turn === Turn.Player
@@ -1119,6 +1137,10 @@ function playMenuActionSound(action) {
 
 function playPhaseSound(phase) {
   if (!phase) return;
+  if (phase.type === "decision") {
+    playSfx("cell_select");
+    return;
+  }
   if (phase.type === "swap") {
     playSfx(phase.actor === Owner.AI ? "turn_ai" : "swap");
     if (phase.actor === Owner.AI) window.setTimeout(() => playSfx("swap"), 140);
@@ -1314,6 +1336,7 @@ function applyPhaseClasses(button, cell, phase) {
   button.classList.add("is-idle");
   if (!phase) return;
 
+  const isDecisionCell = phase.type === "decision" && isPosition(cell, phase.from, phase.to);
   const isSwapCell = phase.type === "swap" && isPosition(cell, phase.from, phase.to);
   const isMatchedCell = phase.matchedIds?.includes(cell.id);
   const isCapturedCell = phase.capturedIds?.includes(cell.id);
@@ -1322,11 +1345,18 @@ function applyPhaseClasses(button, cell, phase) {
   const isRejectedCell = phase.type === "rejected" && isPosition(cell, phase.from, phase.to);
   const isMixedCell = phase.type === "mix" && phase.changedIds?.includes(cell.id);
   const isBonusCell = phase.type === "bonus" && phase.targetIds?.includes(cell.id);
-  const isAffectedCell = isSwapCell || isMatchedCell || isCapturedCell || isMovedCell || isSpawnedCell || isRejectedCell || isMixedCell || isBonusCell;
+  const isAffectedCell = isDecisionCell || isSwapCell || isMatchedCell || isCapturedCell || isMovedCell || isSpawnedCell || isRejectedCell || isMixedCell || isBonusCell;
 
   const actionOwner = phase.actor;
   button.classList.toggle("is-player-action", actionOwner === Owner.Player && isAffectedCell);
   button.classList.toggle("is-ai-action", actionOwner === Owner.AI && isAffectedCell);
+
+  if (isDecisionCell) {
+    button.classList.add("is-ai-thinking");
+    button.classList.toggle("is-swap-from", isPosition(cell, phase.from));
+    button.classList.toggle("is-swap-to", isPosition(cell, phase.to));
+    button.classList.remove("is-idle");
+  }
 
   if (isSwapCell) {
     button.classList.add("is-swapping");
@@ -1402,6 +1432,7 @@ function wait(ms) {
 }
 
 function getPhaseDuration(phase) {
+  if (phase.type === "decision") return 900;
   if (phase.type === "swap") return 700;
   if (phase.type === "bonus") return 520;
   if (phase.type === "mix") return 620;
@@ -1411,4 +1442,50 @@ function getPhaseDuration(phase) {
   if (phase.type === "rejected") return 380;
   if (phase.type === "turnEnd") return 240;
   return 240;
+}
+
+function getAnimatedPhaseDuration(phase) {
+  const base = getPhaseDuration(phase);
+  if (state.settings.victoryMode !== VictoryMode.AiDuel) return base;
+  const speed = Math.max(0.25, getDuelSpeed());
+  if (phase.type === "decision") return Math.round(900 / speed);
+  if (phase.type === "swap" || phase.type === "rejected") return Math.round(340 / Math.sqrt(speed));
+  if (phase.type === "turnEnd") return Math.round(130 / Math.sqrt(speed));
+  return Math.round(480 / Math.sqrt(speed));
+}
+
+function getActorDifficulty(snapshot, actor) {
+  const base = Number(snapshot.settings.aiDifficulty) || 50;
+  if (snapshot.settings.victoryMode !== VictoryMode.AiDuel) return base;
+  return Math.max(1, Math.min(100, Math.round(actor === Owner.Player ? base - 8 : base + 8)));
+}
+
+function getAiPersona(difficulty, actor) {
+  const ladder = actor === Owner.Player
+    ? [
+        [25, "Blue Scout"],
+        [50, "Azure Tactician"],
+        [75, "Crystal Marshal"],
+        [100, "Lighthouse Mind"],
+      ]
+    : [
+        [25, "Red Drifter"],
+        [50, "Rose Duelist"],
+        [75, "Scarlet Warden"],
+        [100, "Crimson Oracle"],
+      ];
+  const match = ladder.find(([max]) => difficulty <= max) ?? ladder.at(-1);
+  return { name: match[1], difficulty };
+}
+
+function renderTestAd(progress = {}) {
+  els.testAdOverlay.hidden = false;
+  const percent = Math.max(0, Math.min(100, Math.round((progress.ratio ?? 0) * 100)));
+  els.testAdProgress.style.width = `${percent}%`;
+  els.testAdCountdown.textContent = String(Math.max(1, Math.ceil((progress.remainingMs ?? 1) / 1000)));
+}
+
+function hideTestAd() {
+  els.testAdOverlay.hidden = true;
+  els.testAdProgress.style.width = "0%";
 }

@@ -8,8 +8,9 @@ export const RewardedAdStatus = Object.freeze({
 });
 
 export class MockRewardedAdProvider {
-  constructor({ delayMs = 800 } = {}) {
+  constructor({ delayMs = 3_200, ticks = 16 } = {}) {
     this.delayMs = delayMs;
+    this.ticks = ticks;
     this.status = RewardedAdStatus.Ready;
   }
 
@@ -17,13 +18,21 @@ export class MockRewardedAdProvider {
     return this.status !== RewardedAdStatus.Loading;
   }
 
-  async show() {
+  async show({ onProgress } = {}) {
     if (!this.isReady()) {
       return { status: RewardedAdStatus.Unavailable, message: "Rewarded ad is already loading." };
     }
 
     this.status = RewardedAdStatus.Loading;
-    await wait(this.delayMs);
+    const startedAt = Date.now();
+    for (let tick = 0; tick <= this.ticks; tick += 1) {
+      const elapsedMs = Date.now() - startedAt;
+      onProgress?.({
+        ratio: Math.min(1, elapsedMs / this.delayMs),
+        remainingMs: Math.max(0, this.delayMs - elapsedMs),
+      });
+      if (tick < this.ticks) await wait(this.delayMs / this.ticks);
+    }
     this.status = RewardedAdStatus.Ready;
 
     return {

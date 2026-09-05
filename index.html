@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Crystal Front Demo</title>
-    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.27" />
+    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.30" />
   </head>
   <body>
     <main class="game-shell battle-shell" aria-label="Crystal Front demo">
@@ -35,10 +35,10 @@
       <section class="zone zone-bonuses" aria-label="Bonuses">
         <div id="duelAssistPanel" class="duel-assist-panel" hidden>
           <div class="duel-speed-control" aria-label="AI duel speed">
-            <span>-2</span>
-            <input id="duelSpeedSlider" type="range" min="-2" max="2" step="1" value="0" />
+            <span>0.25x</span>
+            <input id="duelSpeedSlider" type="range" min="-2" max="2" step="0.1" value="0" />
             <strong id="duelSpeedValue">1x</strong>
-            <span>+2</span>
+            <span>4x</span>
           </div>
         </div>
         <button class="bonus-card" data-bonus="bomb" type="button">
@@ -70,7 +70,7 @@
           <span>TARGET</span>
           <strong id="targetScore">50</strong>
         </div>
-        <div class="system-card info-card version" data-version-check>v0.1.27</div>
+        <div class="system-card info-card version" data-version-check>v0.1.30</div>
       </section>
 
       <div id="toast" class="toast" aria-live="polite"></div>
@@ -80,7 +80,16 @@
       <div class="studio-splash-mark">
         <img src="./assets/runtime/liberman-games-logo.png" alt="Liberman Games" />
       </div>
-      <button id="splashStartButton" class="splash-start-button" type="button">Tap to Start</button>
+    </section>
+
+    <section id="testAdOverlay" class="screen-layer test-ad-overlay" aria-label="Rewarded test ad" hidden>
+      <div class="test-ad-panel">
+        <span>TEST REWARDED AD</span>
+        <strong>Liberman Games</strong>
+        <p>Crystal Front bonus sponsor</p>
+        <div class="test-ad-progress"><i id="testAdProgress"></i></div>
+        <b id="testAdCountdown">3</b>
+      </div>
     </section>
 
     <section id="nicknameMenu" class="screen-layer modal-layer" aria-label="Player nickname" hidden>
@@ -117,7 +126,7 @@
         <footer class="menu-footer">
           <span id="menuProfile">Rating 1200</span>
           <span id="menuRays">260 Rays</span>
-          <span data-version-check>v0.1.27</span>
+          <span data-version-check>v0.1.30</span>
         </footer>
       </div>
     </section>
@@ -139,9 +148,9 @@
           <label id="setupTargetRow" class="control-row">
             <span>
               Target Score
-              <strong id="setupTargetValue">1000</strong>
+              <strong id="setupTargetValue">50</strong>
             </span>
-            <input id="setupTargetScore" type="range" min="50" max="1000" step="50" value="1000" />
+            <input id="setupTargetScore" type="range" min="50" max="1000" step="50" value="50" />
           </label>
           <div class="segmented-row" aria-label="Victory mode">
             <button class="segment is-selected" data-victory-mode="target-score" type="button">Score Target</button>
@@ -229,13 +238,6 @@
             <span>Animations</span>
             <input id="settingAnimations" type="checkbox" checked />
           </label>
-          <label class="control-row">
-            <span>
-              UI Motion
-              <strong id="settingMotionValue">100%</strong>
-            </span>
-            <input id="settingMotion" type="range" min="0" max="100" step="10" value="100" />
-          </label>
         </div>
         <div class="menu-actions compact">
           <button class="menu-button primary" data-action="settings-apply" type="button">Apply</button>
@@ -303,6 +305,6 @@
       </div>
     </section>
 
-    <script type="module" src="./src/presentation/browser/main.js?v=0.1.27"></script>
+    <script type="module" src="./src/presentation/browser/main.js?v=0.1.30"></script>
   </body>
 </html>
