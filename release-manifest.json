@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "sourceRepository": "libertypandaa/cristal-front-2",
-  "sourceCommit": "5d2c27d2fafba6ff42a336739d367d4b761021d9",
+  "sourceCommit": "d4b57e485c59c67739d698ac7060c8e0c42b24d5",
   "releaseRepository": "libertypandaa/crystal-front-demo",
   "files": [
     {
@@ -660,9 +660,9 @@
     },
     {
       "path": "index.html",
-      "bytes": 13259,
-      "gitBlobSha": "2e83e60a0cfa36d5170b669e4921a8454701e362",
-      "sha256": "4167932868b72dae92ed960fcaf97c547ffe84af1d40c6e5bcf765146f8b77da"
+      "bytes": 12813,
+      "gitBlobSha": "6af5e4a5c4ed1872486de7093ed80c9b97e22018",
+      "sha256": "876fad040e82594ba36bc0b28eecd770c8a69b838a73768c630926066bf6a849"
     },
     {
       "path": "scripts/verify-demo-release.mjs",
@@ -696,9 +696,9 @@
     },
     {
       "path": "src/presentation/browser/main.js",
-      "bytes": 55304,
-      "gitBlobSha": "7d5ca73e55b538d2004dfaa6e686f19d34fc93b8",
-      "sha256": "6341af62c080b327ebe2e1acb3cf5e9f6934b88482ba56c6f86bc869019f6fd3"
+      "bytes": 57471,
+      "gitBlobSha": "bd2c5eba84403dd6a5e47a34d9546c87d7c7e5f8",
+      "sha256": "960f193053c52e6690a1bc75cbbef7104f6d7c3627ca0c1279f727790d6e28f1"
     },
     {
       "path": "src/presentation/browser/rewardedAds.js",
@@ -708,9 +708,9 @@
     },
     {
       "path": "src/presentation/browser/styles.css",
-      "bytes": 48647,
-      "gitBlobSha": "05ec67dee2b71763e8c8ba8714b7ea9bb495b1ef",
-      "sha256": "7e3852e6dc830f4d154b30ee6e53c315d15a4326d486ef3cb9853fe37286818a"
+      "bytes": 48609,
+      "gitBlobSha": "71fda537fc348175a1d798923e10ddd4075332a7",
+      "sha256": "e3f25a1ffa78009527784a4fcd62590c011b6057948f35273426c8c24a8c17a5"
     },
     {
       "path": "tests/cascade-chain.mjs",

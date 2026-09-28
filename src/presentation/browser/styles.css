@@ -62,8 +62,7 @@ body[data-view="shop"] .battle-shell,
 body[data-view="leaderboard"] .battle-shell,
 body[data-view="settings"] .battle-shell,
 body[data-view="pause"] .battle-shell,
-body[data-view="result"] .battle-shell,
-body[data-view="exit"] .battle-shell {
+body[data-view="result"] .battle-shell {
   filter: saturate(0.82) brightness(0.72);
 }
 

@@ -2,7 +2,8 @@ import { Bonus, Owner, Turn, VictoryMode } from "../../core/constants.js";
 import { createGame, getSnapshot, restart, runAiTurnWithTrace, runComputerTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
 import { MockRewardedAdProvider, RewardedAdStatus } from "./rewardedAds.js";
 
-const APP_VERSION = "0.1.31";
+const APP_VERSION = "0.1.32";
+const EXIT_FALLBACK_URL = "https://libertypandaa.github.io/liberty-panda-arcade/";
 const PROGRESS_STORAGE_KEY = "crystalFrontProgressV1";
 const PREFERENCES_STORAGE_KEY = "crystalFrontPreferencesV1";
 const ANALYTICS_STORAGE_KEY = "crystalFrontAnalyticsV1";
@@ -131,7 +132,6 @@ const els = {
   settingsMenu: document.querySelector("#settingsMenu"),
   pauseMenu: document.querySelector("#pauseMenu"),
   resultMenu: document.querySelector("#resultMenu"),
-  exitMenu: document.querySelector("#exitMenu"),
   playButton: document.querySelector("#playButton"),
   continueButton: document.querySelector("#continueButton"),
   setupButton: document.querySelector("#setupButton"),
@@ -339,7 +339,10 @@ function handleMenuAction(action, sourceButton) {
   if (action === "resume") continueMatch();
   if (action === "restart") restartMatch();
   if (action === "main") openMainMenu();
-  if (action === "exit-game") exitGame();
+  if (action === "exit-game") {
+    exitGame();
+    return;
+  }
   if (action === "settings-apply") applySettings();
   playMenuActionSound(action);
 }
@@ -523,7 +526,6 @@ function updateScreens(snapshot) {
   els.settingsMenu.hidden = appView !== "settings";
   els.pauseMenu.hidden = appView !== "pause";
   els.resultMenu.hidden = appView !== "result";
-  els.exitMenu.hidden = appView !== "exit";
   els.continueButton.disabled = !hasStartedMatch;
   els.menuProfile.textContent = `${snapshot.profile.nickname} - Rating ${snapshot.profile.rating}`;
   els.menuRays.textContent = `${snapshot.profile.rays} Rays`;
@@ -627,9 +629,71 @@ function closeSetupMenu() {
 }
 
 function exitGame() {
-  if (appView === "pause" || appView === "battle") stopMatchWork({ finishStartedTurn: true });
-  appView = "exit";
+  stopMatchWork({ finishStartedTurn: appView === "pause" || appView === "battle" });
+  try { persistLastMoves(); } catch { /* Storage may be unavailable. */ }
+  persistProgress();
+  appView = "main";
   render();
+
+  const hub = getVerifiedHubPlayer();
+  if (hub) {
+    // Closing must happen during the click's user activation, before the host removes this iframe.
+    try { window.parent.close(); } catch { /* Browser may forbid closing this tab. */ }
+    if (window.parent.closed) return;
+    hub.close();
+    return;
+  }
+
+  if (window.parent !== window) {
+    // An unknown embed cannot safely control its parent history or claim a host close.
+    navigateToExitFallback();
+    return;
+  }
+
+  try { window.close(); } catch { /* Browser tabs opened by the user usually cannot close themselves. */ }
+  if (window.closed) return;
+  if (window.navigation?.canGoBack === false || window.history.length <= 1) {
+    navigateToExitFallback();
+    return;
+  }
+
+  let leftPage = false;
+  window.addEventListener("pagehide", () => { leftPage = true; }, { once: true });
+  window.addEventListener("popstate", () => { leftPage = true; }, { once: true });
+  window.history.back();
+  window.setTimeout(() => {
+    if (!leftPage && !window.closed) navigateToExitFallback();
+  }, 900);
+}
+
+function getVerifiedHubPlayer() {
+  if (window.parent === window) return null;
+  try {
+    const parent = window.parent;
+    const launchId = new URLSearchParams(window.location.search).get("launch");
+    const player = parent.HubPlayer;
+    const current = player?.current?.();
+    if (parent.location.origin !== "https://libertypandaa.github.io"
+      || !parent.location.pathname.startsWith("/liberty-panda-arcade/")
+      || !launchId
+      || current?.id !== launchId
+      || current?.game?.id !== "crystal-front-demo"
+      || current?.frame?.contentWindow !== window
+      || typeof player.close !== "function") return null;
+    return player;
+  } catch {
+    return null;
+  }
+}
+
+function navigateToExitFallback() {
+  try {
+    if (window.top !== window) window.top.location.href = EXIT_FALLBACK_URL;
+    else window.location.assign(EXIT_FALLBACK_URL);
+  } catch {
+    // A sandboxed embed may block top navigation. Leave the game in its own frame.
+    window.location.assign(EXIT_FALLBACK_URL);
+  }
 }
 
 function renderSetupValues() {
