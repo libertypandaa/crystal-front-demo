@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "sourceRepository": "libertypandaa/cristal-front-2",
-  "sourceCommit": "c7cc8cf6de022b694157b1d7b9fa8c720ff0abad",
+  "sourceCommit": "5d2c27d2fafba6ff42a336739d367d4b761021d9",
   "releaseRepository": "libertypandaa/crystal-front-demo",
   "files": [
     {
@@ -661,20 +661,20 @@
     {
       "path": "index.html",
       "bytes": 13259,
-      "gitBlobSha": "51dc9d78b3b1bf8873780200ac1a4a9e31b704c9",
-      "sha256": "5e96512dfcb1594fdd1f8eb26600a034e8513b803eb2f2ebf63b637997aaeecb"
+      "gitBlobSha": "2e83e60a0cfa36d5170b669e4921a8454701e362",
+      "sha256": "4167932868b72dae92ed960fcaf97c547ffe84af1d40c6e5bcf765146f8b77da"
     },
     {
       "path": "scripts/verify-demo-release.mjs",
-      "bytes": 2527,
-      "gitBlobSha": "dc626bfd27b1aab2c37980817ff8b98235dd73bc",
-      "sha256": "7175e1dcb0fe9e9fcb79e8b7257eb3ef078d933f9b60df7d66b1bee8eae39752"
+      "bytes": 2545,
+      "gitBlobSha": "83888b7e2440fa3a7bc6b4403a37cbc8a2e2b031",
+      "sha256": "f136bd031427c70fa88ce97afdbd8df590ad615fedd0505bf0c0165557f2a15f"
     },
     {
       "path": "src/core/board.js",
-      "bytes": 8686,
-      "gitBlobSha": "d89c7590ba368649189caa891796d14790c5907c",
-      "sha256": "b799685cf1cb6c52e5d28cf600941de32e8a0fcb5e8dbdeebce7de534dd74743"
+      "bytes": 11477,
+      "gitBlobSha": "df56d2426b874351a254acfccc4a739973de490b",
+      "sha256": "563a730af545cb62bfbb488776380f37fd814cfefdd09cac4b167e378e00aec5"
     },
     {
       "path": "src/core/constants.js",
@@ -684,9 +684,9 @@
     },
     {
       "path": "src/core/game.js",
-      "bytes": 20499,
-      "gitBlobSha": "066d2ad7f237883cd920a5a9840d18cb913a1d41",
-      "sha256": "5c7ec0b4c933cfbc63a605445bbb7640ce788b68b6f6898ce5c71b328a8ac22d"
+      "bytes": 22311,
+      "gitBlobSha": "fc7a67a8f445f299d805cb859fa7960ff1ace01d",
+      "sha256": "8640835d4dddb4116e04cd46711668f7216deaf01bb656f4b557fe56f03f4cc6"
     },
     {
       "path": "src/core/random.js",
@@ -696,9 +696,9 @@
     },
     {
       "path": "src/presentation/browser/main.js",
-      "bytes": 55220,
-      "gitBlobSha": "1cfe17065b0e52608a6dabf84efe8ada90f1f7f7",
-      "sha256": "f410972ca3b845f96ac227fb6ea4a319fbf3a4e5e144dc60bdc5384e5c3070f1"
+      "bytes": 55304,
+      "gitBlobSha": "7d5ca73e55b538d2004dfaa6e686f19d34fc93b8",
+      "sha256": "6341af62c080b327ebe2e1acb3cf5e9f6934b88482ba56c6f86bc869019f6fd3"
     },
     {
       "path": "src/presentation/browser/rewardedAds.js",
@@ -711,6 +711,12 @@
       "bytes": 48647,
       "gitBlobSha": "05ec67dee2b71763e8c8ba8714b7ea9bb495b1ef",
       "sha256": "7e3852e6dc830f4d154b30ee6e53c315d15a4326d486ef3cb9853fe37286818a"
+    },
+    {
+      "path": "tests/cascade-chain.mjs",
+      "bytes": 5821,
+      "gitBlobSha": "19f28a1c24d927cdadb32b3681f8b07b311f8b74",
+      "sha256": "02d2a88721e3d1cf5c99f4fa19909b60578fe1eb6b5eb2c64cf051a04dd127f9"
     },
     {
       "path": "tests/core-smoke.mjs",

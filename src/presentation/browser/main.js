@@ -2,7 +2,7 @@ import { Bonus, Owner, Turn, VictoryMode } from "../../core/constants.js";
 import { createGame, getSnapshot, restart, runAiTurnWithTrace, runComputerTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
 import { MockRewardedAdProvider, RewardedAdStatus } from "./rewardedAds.js";
 
-const APP_VERSION = "0.1.30";
+const APP_VERSION = "0.1.31";
 const PROGRESS_STORAGE_KEY = "crystalFrontProgressV1";
 const PREFERENCES_STORAGE_KEY = "crystalFrontPreferencesV1";
 const ANALYTICS_STORAGE_KEY = "crystalFrontAnalyticsV1";
@@ -458,7 +458,9 @@ function render(snapshot = getSnapshot(state), phase = null) {
   els.playerScore.textContent = snapshot.scores.player;
   els.aiScore.textContent = snapshot.scores.ai;
   els.turnNumber.textContent = snapshot.turnNumber;
-  els.turnOwner.textContent = formatTurn(snapshot);
+  els.turnOwner.textContent = phase?.type === "match" && phase.cascade > 1
+    ? `CHAIN ×${phase.cascade}`
+    : formatTurn(snapshot);
   const blueAi = getAiPersona(getActorDifficulty(snapshot, Owner.Player), Owner.Player);
   const redAi = getAiPersona(getActorDifficulty(snapshot, Owner.AI), Owner.AI);
   els.playerName.textContent = snapshot.settings.victoryMode === VictoryMode.AiDuel ? blueAi.name : snapshot.profile.nickname;

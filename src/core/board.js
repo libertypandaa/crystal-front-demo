@@ -95,6 +95,79 @@ export function findCascadeMatches(cells, previousMatches) {
   return findMatchesFromCells(cells, getBoundaryCells(previousMatches));
 }
 
+// Plan a swap's entire chain on the unchanged post-swap board. Only cells in
+// horizontal or vertical runs of at least three may join the chain.
+export function planSwapChain(cells, initialMatches, maxWaves = 4) {
+  const valid = new Map(findMatches(cells).map((cell) => [cell.id, cell]));
+  const groups = [];
+  const groupById = new Map();
+
+  for (const cell of valid.values()) {
+    if (groupById.has(cell.id)) continue;
+    const group = { crystal: cell.crystal, ids: [] };
+    const groupIndex = groups.length;
+    groups.push(group);
+    const pending = [cell];
+    groupById.set(cell.id, groupIndex);
+
+    while (pending.length > 0) {
+      const current = pending.pop();
+      group.ids.push(current.id);
+      for (const neighbor of getOrthogonalCells(cells, current)) {
+        if (!valid.has(neighbor.id) || neighbor.crystal !== group.crystal || groupById.has(neighbor.id)) continue;
+        groupById.set(neighbor.id, groupIndex);
+        pending.push(neighbor);
+      }
+    }
+  }
+
+  const depthByGroup = new Map();
+  const pending = [];
+  for (const cell of initialMatches) {
+    const groupIndex = groupById.get(cell.id);
+    if (groupIndex === undefined || depthByGroup.has(groupIndex)) continue;
+    depthByGroup.set(groupIndex, 1);
+    pending.push(groupIndex);
+  }
+
+  for (let cursor = 0; cursor < pending.length; cursor += 1) {
+    const groupIndex = pending[cursor];
+    const nextDepth = depthByGroup.get(groupIndex) + 1;
+    if (nextDepth > maxWaves) continue;
+    for (const id of groups[groupIndex].ids) {
+      const cell = valid.get(id);
+      for (const neighbor of getOrthogonalCells(cells, cell)) {
+        const nextGroup = groupById.get(neighbor.id);
+        if (nextGroup === undefined || nextGroup === groupIndex || depthByGroup.has(nextGroup)) continue;
+        depthByGroup.set(nextGroup, nextDepth);
+        pending.push(nextGroup);
+      }
+    }
+  }
+
+  const waves = Array.from({ length: maxWaves }, (_, index) => ({ cascade: index + 1, ids: [] }));
+  for (const [groupIndex, depth] of depthByGroup) {
+    waves[depth - 1].ids.push(...groups[groupIndex].ids);
+  }
+  const orderedWaves = waves.filter((wave) => wave.ids.length > 0);
+  for (const wave of orderedWaves) wave.ids.sort((a, b) => cellIndex(a) - cellIndex(b));
+  const matchedIds = orderedWaves.flatMap((wave) => wave.ids);
+  return { waves: orderedWaves, matchedIds };
+}
+
+function getOrthogonalCells(cells, cell) {
+  return [
+    [cell.row - 1, cell.col], [cell.row + 1, cell.col],
+    [cell.row, cell.col - 1], [cell.row, cell.col + 1],
+  ].filter(([row, col]) => row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE)
+    .map(([row, col]) => getCell(cells, row, col));
+}
+
+function cellIndex(id) {
+  const [row, col] = id.split("-").map(Number);
+  return row * BOARD_SIZE + col;
+}
+
 export function getBoundaryCells(cells) {
   const boundary = new Set();
   const source = new Set(cells.map((cell) => cell.id ?? `${cell.row}-${cell.col}`));

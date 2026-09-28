@@ -28,7 +28,9 @@ jobs:
         with:
           node-version: '22'
       - name: Test game rules
-        run: node tests/core-smoke.mjs
+        run: |
+          node tests/core-smoke.mjs
+          node tests/cascade-chain.mjs
       - name: Verify source manifest
         run: node scripts/verify-demo-release.mjs
       - name: Assemble Pages artifact
