@@ -44,6 +44,11 @@ const DEFAULT_PREFERENCES = Object.freeze({
 const persistedProgress = loadPersistedProgress();
 let state = hydrateProgress(createGame(271828), persistedProgress);
 let isAnimating = false;
+let matchGeneration = 0;
+let activeTurn = null;
+let autoRun = null;
+const resumeWaiters = new Set();
+let delayedSwapSound = null;
 let isClaimingAdReward = false;
 let appView = "splash";
 let pendingViewAfterSplash = state.profile.nicknameSet ? "main" : "nickname";
@@ -320,7 +325,6 @@ els.nicknameForm.addEventListener("submit", (event) => {
 
 function handleMenuAction(action, sourceButton) {
   clearButtonFeedback({ includeRipple: true });
-  playMenuActionSound(action);
   if (action === "start") startNewMatch();
   if (action === "continue") continueMatch();
   if (action === "setup") openSetupMenu();
@@ -337,33 +341,76 @@ function handleMenuAction(action, sourceButton) {
   if (action === "main") openMainMenu();
   if (action === "exit-game") exitGame();
   if (action === "settings-apply") applySettings();
+  playMenuActionSound(action);
 }
 
 async function maybeRunAi() {
-  if (appView !== "battle" || state.turn !== Turn.AI || state.winner) return;
-  await wait(420);
-  if (appView !== "battle") return;
-  await commitAnimatedTurn(runAiTurnWithTrace(state));
+  return ensureAutoRun();
 }
 
 async function maybeRunAiDuel() {
-  if (appView !== "battle" || state.winner || state.settings.victoryMode !== VictoryMode.AiDuel || state.turn === Turn.Ended || isAnimating || state.selectedBonus) return;
-  await wait(420 / Math.max(0.35, getDuelSpeed()));
-  if (appView !== "battle" || state.winner || state.settings.victoryMode !== VictoryMode.AiDuel || isAnimating || state.selectedBonus) return;
-  await commitAnimatedTurn(runComputerTurnWithTrace(state, state.turn === Turn.Player ? Owner.Player : Owner.AI));
-  await maybeRunAiDuel();
+  return ensureAutoRun();
 }
 
-async function commitAnimatedTurn(result) {
+function ensureAutoRun() {
+  if (autoRun?.generation === matchGeneration) return autoRun.promise;
+  const run = { generation: matchGeneration, promise: null };
+  autoRun = run;
+  run.promise = (async () => {
+    while (run.generation === matchGeneration && !state.winner && state.turn !== Turn.Ended) {
+      const duel = state.settings.victoryMode === VictoryMode.AiDuel;
+      if ((!duel && state.turn !== Turn.AI) || (duel && state.selectedBonus)) return;
+      if (!await waitForBattle(run.generation)) return;
+      await wait(duel ? 420 / Math.max(0.35, getDuelSpeed()) : 420);
+      if (!await waitForBattle(run.generation)) return;
+      if (state.winner || (duel && state.selectedBonus)) return;
+      const result = duel
+        ? runComputerTurnWithTrace(state, state.turn === Turn.Player ? Owner.Player : Owner.AI)
+        : runAiTurnWithTrace(state);
+      if (!await commitAnimatedTurn(result, run.generation)) return;
+      if (!duel) return;
+    }
+  })().finally(() => {
+    if (autoRun === run) autoRun = null;
+  });
+  return run.promise;
+}
+
+async function waitForBattle(generation) {
+  while (generation === matchGeneration && appView === "pause") {
+    await new Promise((resolve) => resumeWaiters.add(resolve));
+  }
+  return generation === matchGeneration && appView === "battle";
+}
+
+function wakeResumeWaiters() {
+  for (const resolve of resumeWaiters) resolve();
+  resumeWaiters.clear();
+}
+
+async function commitAnimatedTurn(result, generation = matchGeneration) {
+  if (generation !== matchGeneration || appView !== "battle") return false;
+  const turn = { generation, result, phase: null };
+  activeTurn = turn;
   isAnimating = true;
   document.body.classList.add("is-animating");
 
   for (const phase of result.trace) {
+    if (!await waitForBattle(generation)) return false;
+    turn.phase = phase;
     playPhaseSound(phase);
     if (phase.cells) render(makeSnapshot(phase.cells), phase);
     await wait(getAnimatedPhaseDuration(phase));
+    if (!await waitForBattle(generation)) return false;
   }
 
+  if (generation !== matchGeneration || activeTurn !== turn) return false;
+  activeTurn = null;
+  finishTurn(result);
+  return true;
+}
+
+function finishTurn(result) {
   state = result.state;
   if (state.winner && !currentMatchFinalized) {
     state = finalizeMatchProgress(state);
@@ -373,9 +420,32 @@ async function commitAnimatedTurn(result) {
   persistProgress();
   isAnimating = false;
   document.body.classList.remove("is-animating");
-  if (state.winner) appView = "result";
+  if (state.winner && appView === "battle") appView = "result";
   render();
-  playResultSound();
+  if (appView === "result") playResultSound();
+}
+
+function stopMatchWork({ finishStartedTurn = false } = {}) {
+  const startedTurn = activeTurn;
+  matchGeneration += 1;
+  activeTurn = null;
+  autoRun = null;
+  wakeResumeWaiters();
+  window.clearTimeout(delayedSwapSound);
+  delayedSwapSound = null;
+  audioController.stopAll();
+  if (finishStartedTurn && startedTurn) {
+    finishTurn(startedTurn.result);
+  } else {
+    isAnimating = false;
+    document.body.classList.remove("is-animating");
+  }
+}
+
+function renderVisibleTurn() {
+  const phase = activeTurn?.phase;
+  if (phase?.cells) render(makeSnapshot(phase.cells), phase);
+  else render();
 }
 
 function render(snapshot = getSnapshot(state), phase = null) {
@@ -482,11 +552,13 @@ function updateResult(snapshot) {
 function continueMatch() {
   if (!hasStartedMatch) return;
   appView = state.winner ? "result" : "battle";
-  render();
-  maybeRunAiDuel();
+  renderVisibleTurn();
+  wakeResumeWaiters();
+  if (appView === "battle") ensureAutoRun();
 }
 
 function startNewMatch() {
+  stopMatchWork();
   state = hydrateProgress(createGame(Date.now(), pendingSettings));
   currentMatchFinalized = false;
   lastResultSoundKey = null;
@@ -497,7 +569,7 @@ function startNewMatch() {
 }
 
 function restartMatch() {
-  if (isAnimating) return;
+  stopMatchWork();
   state = hydrateProgress(restart(state));
   currentMatchFinalized = false;
   lastResultSoundKey = null;
@@ -508,27 +580,19 @@ function restartMatch() {
 }
 
 function openPauseMenu() {
-  if (isAnimating || appView !== "battle" || state.winner) return;
+  if (appView !== "battle" || state.winner) return;
+  window.clearTimeout(delayedSwapSound);
+  delayedSwapSound = null;
+  audioController.stopAll();
   playSfx("pause");
   appView = "pause";
-  render();
+  renderVisibleTurn();
 }
 
 function openMainMenu() {
+  if (appView === "pause" || appView === "battle") stopMatchWork({ finishStartedTurn: true });
   appView = "main";
   render();
-}
-
-async function closeNativeApp() {
-  try {
-    const appPlugin = window.Capacitor?.Plugins?.App;
-    if (!appPlugin?.exitApp) throw new Error("Native App plugin is unavailable.");
-    await appPlugin.exitApp();
-  } catch {
-    appView = "main";
-    showToast("Use the system Back button to close the app.");
-    render();
-  }
 }
 
 function openSetupMenu() {
@@ -549,6 +613,7 @@ function openLeaderboardMenu() {
 }
 
 function openSettingsMenu() {
+  if (appView === "pause") stopMatchWork({ finishStartedTurn: true });
   els.settingsNickname.value = state.profile.nickname;
   appView = "settings";
   render();
@@ -560,7 +625,9 @@ function closeSetupMenu() {
 }
 
 function exitGame() {
-  closeNativeApp();
+  if (appView === "pause" || appView === "battle") stopMatchWork({ finishStartedTurn: true });
+  appView = "exit";
+  render();
 }
 
 function renderSetupValues() {
@@ -1143,7 +1210,13 @@ function playPhaseSound(phase) {
   }
   if (phase.type === "swap") {
     playSfx(phase.actor === Owner.AI ? "turn_ai" : "swap");
-    if (phase.actor === Owner.AI) window.setTimeout(() => playSfx("swap"), 140);
+    if (phase.actor === Owner.AI) {
+      window.clearTimeout(delayedSwapSound);
+      delayedSwapSound = window.setTimeout(() => {
+        delayedSwapSound = null;
+        if (appView === "battle") playSfx("swap");
+      }, 140);
+    }
     return;
   }
   if (phase.type === "rejected") {
@@ -1183,6 +1256,7 @@ function playResultSound() {
 function createAudioController() {
   const cache = new Map();
   const blockedQueue = new Set();
+  let audioGeneration = 0;
 
   function canPlay() {
     return uiPreferences.sound && uiPreferences.sfx;
@@ -1202,14 +1276,15 @@ function createAudioController() {
 
   async function play(name, options = {}) {
     if (!canPlay()) return;
+    const generation = audioGeneration;
     const audio = getAudio(name);
     if (!audio) return;
     try {
       audio.currentTime = 0;
       await audio.play();
-      blockedQueue.delete(name);
+      if (generation === audioGeneration) blockedQueue.delete(name);
     } catch {
-      if (options.queueOnBlock !== false) blockedQueue.add(name);
+      if (generation === audioGeneration && options.queueOnBlock !== false) blockedQueue.add(name);
     }
   }
 
@@ -1230,7 +1305,16 @@ function createAudioController() {
     audio.currentTime = 0;
   }
 
-  return { play, unlock, stop };
+  function stopAll() {
+    audioGeneration += 1;
+    blockedQueue.clear();
+    for (const audio of cache.values()) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+  }
+
+  return { play, unlock, stop, stopAll };
 }
 
 function getAudioSource(name) {

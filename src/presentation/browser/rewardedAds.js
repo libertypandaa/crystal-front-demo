@@ -43,20 +43,6 @@ export class MockRewardedAdProvider {
   }
 }
 
-export class AdMobRewardedAdProvider {
-  async show() {
-    return {
-      status: RewardedAdStatus.Unavailable,
-      provider: "admob",
-      message: "AdMob rewarded ads are available only in the Android build.",
-    };
-  }
-
-  isReady() {
-    return false;
-  }
-}
-
 function wait(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }

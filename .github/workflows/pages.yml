@@ -23,6 +23,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test game rules
+        run: node tests/core-smoke.mjs
+      - name: Verify source manifest
+        run: node scripts/verify-demo-release.mjs
+      - name: Assemble Pages artifact
+        run: |
+          mkdir -p public/assets/generated/audio
+          cp index.html release-manifest.json public/
+          cp -R src public/
+          cp -R assets/runtime public/assets/
+          cp -R assets/generated/audio/core-sfx-kits-v1 public/assets/generated/audio/
       - name: Configure Pages
         uses: actions/configure-pages@v5
         with:
@@ -30,7 +45,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: public
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
