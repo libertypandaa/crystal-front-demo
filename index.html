@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Crystal Front Demo</title>
-    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.32" />
+    <link rel="stylesheet" href="./src/presentation/browser/styles.css?v=0.1.33" />
   </head>
   <body>
     <main class="game-shell battle-shell" aria-label="Crystal Front demo">
@@ -70,7 +70,7 @@
           <span>TARGET</span>
           <strong id="targetScore">50</strong>
         </div>
-        <div class="system-card info-card version" data-version-check>v0.1.32</div>
+        <div class="system-card info-card version" data-version-check>v0.1.33</div>
       </section>
 
       <div id="toast" class="toast" aria-live="polite"></div>
@@ -126,8 +126,37 @@
         <footer class="menu-footer">
           <span id="menuProfile">Rating 1200</span>
           <span id="menuRays">260 Rays</span>
-          <span data-version-check>v0.1.32</span>
+          <span data-version-check>v0.1.33</span>
         </footer>
+        <div id="updateNotice" class="menu-actions compact" hidden>
+          <p id="updateMessage" role="status">Update ready.</p>
+          <button id="applyUpdateButton" class="menu-button" data-action="apply-update" type="button">Update Now</button>
+          <button class="menu-button" data-action="later-update" type="button">Later</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="accountGate" class="screen-layer modal-layer" aria-label="Arcade account status" hidden>
+      <div class="modal-panel">
+        <header class="modal-header">
+          <p>ARCADE ACCOUNT</p>
+          <h2 id="accountGateTitle">Checking your account…</h2>
+        </header>
+        <p id="accountGateMessage">Your saved progress has not been deleted.</p>
+        <div class="menu-actions compact">
+          <button class="menu-button primary" data-action="retry-account" type="button">Retry</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="exitSaveError" class="screen-layer modal-layer" aria-label="Save error" hidden>
+      <div class="modal-panel">
+        <header class="modal-header"><p>EXIT PAUSED</p><h2>Progress not saved</h2></header>
+        <p id="exitSaveErrorMessage">Couldn’t save your latest progress. The game is still open.</p>
+        <div class="menu-actions compact">
+          <button id="retryExitButton" class="menu-button primary" data-action="retry-exit" type="button">Retry Save &amp; Exit</button>
+          <button class="menu-button" data-action="cancel-exit" type="button">Continue Playing</button>
+        </div>
       </div>
     </section>
 
@@ -293,6 +322,8 @@
       </div>
     </section>
 
-    <script type="module" src="./src/presentation/browser/main.js?v=0.1.32"></script>
+    <script src="./src/presentation/browser/vendor/game-platform-sdk.js?v=1.1.0"></script>
+    <script src="./src/presentation/browser/vendor/game-analytics-sdk.js?v=1.0.0"></script>
+    <script type="module" src="./src/presentation/browser/main.js?v=0.1.33"></script>
   </body>
 </html>

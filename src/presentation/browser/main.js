@@ -1,9 +1,16 @@
 import { Bonus, Owner, Turn, VictoryMode } from "../../core/constants.js";
 import { createGame, getSnapshot, restart, runAiTurnWithTrace, runComputerTurnWithTrace, selectBonus, selectCell, submitBonusTurn, submitSwapTurn } from "../../core/game.js";
 import { MockRewardedAdProvider, RewardedAdStatus } from "./rewardedAds.js";
+import { createAccountProgressAdapter, createTelemetry, readEconomy, writeVerifiedJson } from "./lpaFoundation.js";
 
-const APP_VERSION = "0.1.32";
-const EXIT_FALLBACK_URL = "https://libertypandaa.github.io/liberty-panda-arcade/";
+const APP_VERSION = "0.1.33";
+const IS_EMBEDDED = window.parent !== window;
+const platform = window.LibertyPanda;
+const telemetry = createTelemetry(window.LibertyPandaAnalytics);
+let accountStorage = null;
+try { accountStorage = window.localStorage; } catch { /* A restricted frame must show the account gate. */ }
+const accountProgress = IS_EMBEDDED && platform && accountStorage
+  ? createAccountProgressAdapter(platform, accountStorage) : null;
 const PROGRESS_STORAGE_KEY = "crystalFrontProgressV1";
 const PREFERENCES_STORAGE_KEY = "crystalFrontPreferencesV1";
 const ANALYTICS_STORAGE_KEY = "crystalFrontAnalyticsV1";
@@ -42,7 +49,7 @@ const DEFAULT_PREFERENCES = Object.freeze({
   animations: true,
 });
 
-const persistedProgress = loadPersistedProgress();
+let persistedProgress = IS_EMBEDDED ? null : loadPersistedProgress();
 let state = hydrateProgress(createGame(271828), persistedProgress);
 let isAnimating = false;
 let matchGeneration = 0;
@@ -52,7 +59,7 @@ const resumeWaiters = new Set();
 let delayedSwapSound = null;
 let isClaimingAdReward = false;
 let appView = "splash";
-let pendingViewAfterSplash = state.profile.nicknameSet ? "main" : "nickname";
+let pendingViewAfterSplash = IS_EMBEDDED ? "account" : state.profile.nicknameSet ? "main" : "nickname";
 let hasStartedMatch = false;
 let pendingSettings = { ...state.settings };
 let setupReturnView = "main";
@@ -63,6 +70,17 @@ let audioController = createAudioController();
 let lastResultSoundKey = null;
 let splashTimer = null;
 let splashStarted = false;
+let accountOwner = null;
+let accountStatus = "unknown";
+let accountError = null;
+let exitBusy = false;
+let exitReturnView = "main";
+let economyRead = { status: "unavailable" };
+let economyReadGeneration = 0;
+let pendingVersion = null;
+let updateNoticeDismissed = false;
+let updateApplying = false;
+let lastTelemetryPlaying = null;
 
 const shopItems = [
   { bonus: Bonus.Bomb, label: "Bomb", detail: "Clears a 3x3 strike zone.", cost: 35 },
@@ -132,6 +150,15 @@ const els = {
   settingsMenu: document.querySelector("#settingsMenu"),
   pauseMenu: document.querySelector("#pauseMenu"),
   resultMenu: document.querySelector("#resultMenu"),
+  accountGate: document.querySelector("#accountGate"),
+  accountGateTitle: document.querySelector("#accountGateTitle"),
+  accountGateMessage: document.querySelector("#accountGateMessage"),
+  exitSaveError: document.querySelector("#exitSaveError"),
+  exitSaveErrorMessage: document.querySelector("#exitSaveErrorMessage"),
+  retryExitButton: document.querySelector("#retryExitButton"),
+  updateNotice: document.querySelector("#updateNotice"),
+  updateMessage: document.querySelector("#updateMessage"),
+  applyUpdateButton: document.querySelector("#applyUpdateButton"),
   playButton: document.querySelector("#playButton"),
   continueButton: document.querySelector("#continueButton"),
   setupButton: document.querySelector("#setupButton"),
@@ -168,6 +195,7 @@ const els = {
 
 render();
 startSplashExperience();
+initializeAccountContext();
 
 els.board.addEventListener("click", async (event) => {
   if (isAnimating || appView !== "battle") return;
@@ -325,6 +353,17 @@ els.nicknameForm.addEventListener("submit", (event) => {
 
 function handleMenuAction(action, sourceButton) {
   clearButtonFeedback({ includeRipple: true });
+  if (action === "retry-account") { retryAccountContext(); return; }
+  if (action === "retry-exit") { exitGame(); return; }
+  if (action === "cancel-exit") {
+    appView = isAccountReady() ? exitReturnView : "account";
+    renderVisibleTurn();
+    if (appView === "battle") { wakeResumeWaiters(); ensureAutoRun(); }
+    return;
+  }
+  if (action === "apply-update") { applyPendingUpdate(); return; }
+  if (action === "later-update") { updateNoticeDismissed = true; render(); return; }
+  if (IS_EMBEDDED && !isAccountReady()) return;
   if (action === "start") startNewMatch();
   if (action === "continue") continueMatch();
   if (action === "setup") openSetupMenu();
@@ -346,6 +385,102 @@ function handleMenuAction(action, sourceButton) {
   if (action === "settings-apply") applySettings();
   playMenuActionSound(action);
 }
+
+function isAccountReady() {
+  return !IS_EMBEDDED || Boolean(accountProgress && accountOwner && platform?.isAccountContextCurrent(accountOwner));
+}
+
+async function initializeAccountContext() {
+  if (!IS_EMBEDDED) return;
+  if (!platform || platform.version !== "1.1.0") {
+    accountError = "Arcade connection unavailable. Your saved progress has not been deleted.";
+    return;
+  }
+  platform.onAccountContextChange(handleAccountContext); // subscribe before the first request
+  platform.enableExit();
+  if (!accountProgress) {
+    accountError = "STORAGE_UNAVAILABLE";
+    if (appView !== "splash") { appView = "account"; render(); }
+    return;
+  }
+  try {
+    if (!await platform.ready) throw new Error("PLATFORM_UNAVAILABLE");
+    handleAccountContext(await platform.getAccountContext());
+  } catch (error) {
+    accountError = error?.message ?? "PLATFORM_UNAVAILABLE";
+    if (appView !== "splash") { appView = "account"; render(); }
+  }
+}
+
+async function retryAccountContext() {
+  if (!IS_EMBEDDED || !platform) return;
+  if (!accountProgress) { accountError = "STORAGE_UNAVAILABLE"; render(); return; }
+  accountError = null;
+  render();
+  try { handleAccountContext(await platform.getAccountContext()); }
+  catch (error) { accountError = error?.message ?? "PLATFORM_UNAVAILABLE"; render(); }
+}
+
+function handleAccountContext(context) {
+  if (!IS_EMBEDDED) return;
+  accountStatus = context?.status ?? "unknown";
+  accountError = null;
+  if (context?.status === "ready" && platform.isAccountContextCurrent(context)) {
+    const sameGeneration = accountOwner?.generation === context.generation
+      && accountOwner?.storageNamespace === context.storageNamespace
+      && accountOwner?.epoch === context.epoch
+      && accountOwner?.contextSessionId === context.contextSessionId;
+    if (sameGeneration) { accountOwner = context; return; } // same-actor refresh: keep match and profile
+    if (accountOwner) {
+      stopMatchWork();
+      telemetry.matchEnd("abandon", 0);
+    }
+    economyReadGeneration += 1;
+    economyRead = { status: "unavailable" };
+    try {
+      const saved = accountProgress.read();
+      persistedProgress = saved;
+      state = hydrateProgress(createGame(271828), saved);
+      shopState = { lastAdClaimAt: saved?.shop?.lastAdClaimAt ?? 0 };
+      hasStartedMatch = false;
+      currentMatchFinalized = false;
+      pendingSettings = { ...state.settings };
+      accountOwner = context;
+      pendingViewAfterSplash = state.profile.nicknameSet ? "main" : "nickname";
+      if (appView !== "splash") appView = pendingViewAfterSplash;
+      if (appView !== "splash") telemetry.ready();
+    } catch (error) {
+      accountOwner = null;
+      accountError = error?.message ?? "STORAGE_UNAVAILABLE";
+      pendingViewAfterSplash = "account";
+      if (appView !== "splash") appView = "account";
+    }
+    render();
+    return;
+  }
+
+  if (accountOwner) {
+    stopMatchWork();
+    telemetry.matchEnd("abandon", 0);
+    accountOwner = null;
+    economyReadGeneration += 1;
+    economyRead = { status: "unavailable" };
+  }
+  pendingViewAfterSplash = "account";
+  if (appView !== "splash") appView = "account";
+  render();
+}
+
+function updateTelemetryPlaying() {
+  const playing = appView === "battle" && !document.hidden && isAccountReady()
+    && state.settings.victoryMode !== VictoryMode.AiDuel;
+  if (playing === lastTelemetryPlaying) return;
+  lastTelemetryPlaying = playing;
+  telemetry.setPlaying(playing);
+}
+
+document.addEventListener("visibilitychange", updateTelemetryPlaying);
+window.addEventListener("pagehide", () => { telemetry.setPlaying(false); telemetry.matchEnd("abandon", 0); });
 
 async function maybeRunAi() {
   return ensureAutoRun();
@@ -418,6 +553,8 @@ function finishTurn(result) {
   if (state.winner && !currentMatchFinalized) {
     state = finalizeMatchProgress(state);
     currentMatchFinalized = true;
+    const outcome = state.winner === Owner.Player ? "win" : state.winner === Owner.AI ? "loss" : "draw";
+    telemetry.matchEnd(outcome, getSnapshot(state).scores.player);
   }
   persistLastMoves();
   persistProgress();
@@ -453,6 +590,7 @@ function renderVisibleTurn() {
 
 function render(snapshot = getSnapshot(state), phase = null) {
   updateScreens(snapshot);
+  updateTelemetryPlaying();
   const control = getControl(snapshot);
   els.board.style.setProperty("--player-control", `${control.playerPercent}%`);
   els.board.style.setProperty("--front-blend-start", `${Math.max(0, control.playerPercent - 7)}%`);
@@ -526,9 +664,29 @@ function updateScreens(snapshot) {
   els.settingsMenu.hidden = appView !== "settings";
   els.pauseMenu.hidden = appView !== "pause";
   els.resultMenu.hidden = appView !== "result";
-  els.continueButton.disabled = !hasStartedMatch;
+  els.accountGate.hidden = appView !== "account";
+  els.exitSaveError.hidden = appView !== "exit-error";
+  els.continueButton.disabled = !hasStartedMatch || !isAccountReady();
+  const accountText = accountStatus === "changed"
+    ? ["Account changed", "Reopen Crystal Front from the Arcade. Your saved progress has not been deleted."]
+    : accountStatus === "absent"
+      ? ["Sign in to continue", "Sign in through the Arcade. Your saved progress has not been deleted."]
+      : accountStatus === "expired"
+        ? ["Session expired", "Sign in through the Arcade again. Your saved progress has not been deleted."]
+        : ["Checking your account…", "Your saved progress has not been deleted."];
+  els.accountGateTitle.textContent = accountError ? "Account unavailable" : accountText[0];
+  els.accountGateMessage.textContent = accountError
+    ? `Could not open your account save (${accountError}). Your saved progress has not been deleted.`
+    : accountText[1];
+  els.retryExitButton.disabled = !isAccountReady();
+  els.updateNotice.hidden = !pendingVersion || updateNoticeDismissed || appView !== "main";
+  if (pendingVersion) {
+    const safe = canApplyPendingUpdate();
+    els.updateMessage.textContent = safe ? `Update v${pendingVersion} is ready.` : `Update v${pendingVersion} is ready. Finish this match first.`;
+    els.applyUpdateButton.disabled = !safe;
+  }
   els.menuProfile.textContent = `${snapshot.profile.nickname} - Rating ${snapshot.profile.rating}`;
-  els.menuRays.textContent = `${snapshot.profile.rays} Rays`;
+  els.menuRays.textContent = `${snapshot.profile.rays} ${IS_EMBEDDED ? "Local Rays" : "Rays"}`;
   renderSetupValues();
   renderShop(snapshot);
   renderLeaderboard(snapshot);
@@ -554,32 +712,41 @@ function updateResult(snapshot) {
 }
 
 function continueMatch() {
-  if (!hasStartedMatch) return;
+  if (!hasStartedMatch || !isAccountReady()) return;
   appView = state.winner ? "result" : "battle";
   renderVisibleTurn();
   wakeResumeWaiters();
   if (appView === "battle") ensureAutoRun();
+  updateTelemetryPlaying();
 }
 
 function startNewMatch() {
+  if (!isAccountReady()) return;
+  telemetry.matchEnd("abandon", 0);
   stopMatchWork();
   state = hydrateProgress(createGame(Date.now(), pendingSettings));
   currentMatchFinalized = false;
   lastResultSoundKey = null;
   hasStartedMatch = true;
   appView = "battle";
+  telemetry.matchStart(state.settings.victoryMode.replaceAll("-", "_"));
   render();
+  updateTelemetryPlaying();
   maybeRunAiDuel();
 }
 
 function restartMatch() {
+  if (!isAccountReady()) return;
+  telemetry.matchEnd("abandon", 0);
   stopMatchWork();
   state = hydrateProgress(restart(state));
   currentMatchFinalized = false;
   lastResultSoundKey = null;
   hasStartedMatch = true;
   appView = "battle";
+  telemetry.matchStart(state.settings.victoryMode.replaceAll("-", "_"));
   render();
+  updateTelemetryPlaying();
   maybeRunAiDuel();
 }
 
@@ -590,12 +757,14 @@ function openPauseMenu() {
   audioController.stopAll();
   playSfx("pause");
   appView = "pause";
+  updateTelemetryPlaying();
   renderVisibleTurn();
 }
 
 function openMainMenu() {
   if (appView === "pause" || appView === "battle") stopMatchWork({ finishStartedTurn: true });
   appView = "main";
+  updateTelemetryPlaying();
   render();
 }
 
@@ -607,7 +776,18 @@ function openSetupMenu() {
 }
 
 function openShopMenu() {
+  if (!isAccountReady()) return;
   appView = "shop";
+  if (IS_EMBEDDED) {
+    economyRead = { status: "loading" };
+    const owner = accountOwner;
+    const generation = ++economyReadGeneration;
+    readEconomy(platform).then((result) => {
+      if (generation !== economyReadGeneration || !platform.isAccountContextCurrent(owner)) return;
+      economyRead = result;
+      if (appView === "shop") render();
+    });
+  }
   render();
 }
 
@@ -628,71 +808,30 @@ function closeSetupMenu() {
   render();
 }
 
-function exitGame() {
-  stopMatchWork({ finishStartedTurn: appView === "pause" || appView === "battle" });
-  try { persistLastMoves(); } catch { /* Storage may be unavailable. */ }
-  persistProgress();
-  appView = "main";
-  render();
-
-  const hub = getVerifiedHubPlayer();
-  if (hub) {
-    // Closing must happen during the click's user activation, before the host removes this iframe.
-    try { window.parent.close(); } catch { /* Browser may forbid closing this tab. */ }
-    if (window.parent.closed) return;
-    hub.close();
-    return;
-  }
-
-  if (window.parent !== window) {
-    // An unknown embed cannot safely control its parent history or claim a host close.
-    navigateToExitFallback();
-    return;
-  }
-
-  try { window.close(); } catch { /* Browser tabs opened by the user usually cannot close themselves. */ }
-  if (window.closed) return;
-  if (window.navigation?.canGoBack === false || window.history.length <= 1) {
-    navigateToExitFallback();
-    return;
-  }
-
-  let leftPage = false;
-  window.addEventListener("pagehide", () => { leftPage = true; }, { once: true });
-  window.addEventListener("popstate", () => { leftPage = true; }, { once: true });
-  window.history.back();
-  window.setTimeout(() => {
-    if (!leftPage && !window.closed) navigateToExitFallback();
-  }, 900);
-}
-
-function getVerifiedHubPlayer() {
-  if (window.parent === window) return null;
+async function exitGame() {
+  if (exitBusy) return;
+  if (appView !== "exit-error") exitReturnView = appView;
+  exitBusy = true;
   try {
-    const parent = window.parent;
-    const launchId = new URLSearchParams(window.location.search).get("launch");
-    const player = parent.HubPlayer;
-    const current = player?.current?.();
-    if (parent.location.origin !== "https://libertypandaa.github.io"
-      || !parent.location.pathname.startsWith("/liberty-panda-arcade/")
-      || !launchId
-      || current?.id !== launchId
-      || current?.game?.id !== "crystal-front-demo"
-      || current?.frame?.contentWindow !== window
-      || typeof player.close !== "function") return null;
-    return player;
-  } catch {
-    return null;
-  }
-}
-
-function navigateToExitFallback() {
-  try {
-    if (window.top !== window) window.top.location.href = EXIT_FALLBACK_URL;
-    else window.location.assign(EXIT_FALLBACK_URL);
-  } catch {
-    // A sandboxed embed may block top navigation. Leave the game in its own frame.
-    window.location.assign(EXIT_FALLBACK_URL);
+    const callbacks = {
+      save: saveProgressForExit,
+      stop: () => {
+        stopMatchWork({ finishStartedTurn: false });
+        telemetry.matchEnd("abandon", 0);
+        telemetry.setPlaying(false);
+      },
+      fallback: () => { appView = "main"; render(); },
+    };
+    if (platform) await platform.exit(callbacks);
+    else { await callbacks.save(); callbacks.stop(); callbacks.fallback(); }
+  } catch (error) {
+    appView = "exit-error";
+    els.exitSaveErrorMessage.textContent = error?.message === "ACCOUNT_CONTEXT_CHANGED"
+      ? "Account context changed. Reopen Crystal Front from the Arcade; your saved progress has not been deleted."
+      : "Couldn’t save your latest progress. The game is still open.";
+    render();
+  } finally {
+    exitBusy = false;
   }
 }
 
@@ -712,6 +851,35 @@ function renderSetupValues() {
 }
 
 function renderShop(snapshot) {
+  if (IS_EMBEDDED) {
+    els.shopList.replaceChildren();
+    const balance = document.createElement("section");
+    balance.className = "shop-section shop-balance";
+    const local = document.createElement("p");
+    local.textContent = `Local Rays: ${snapshot.profile.rays} (not LPA wallet)`;
+    const wallet = document.createElement("p");
+    wallet.textContent = economyRead.status === "ready" && Number.isFinite(economyRead.wallet?.balance)
+      ? `LPA wallet: ${economyRead.wallet.balance} ${economyRead.wallet.currency ?? "LPA"} (read only)`
+      : economyRead.status === "loading" ? "LPA wallet: loading…"
+        : economyRead.status === "error" ? "LPA wallet: could not load. Reopen Shop to retry." : "LPA wallet: —";
+    const notice = document.createElement("p");
+    notice.textContent = "Account purchases and rewarded ads are unavailable in this release. Combat bonuses are local only.";
+    balance.append(local, wallet, notice);
+    els.shopList.append(balance);
+    const bonusSection = document.createElement("section");
+    bonusSection.className = "shop-section";
+    const title = document.createElement("h3");
+    title.textContent = "Local combat bonuses";
+    bonusSection.append(title);
+    for (const item of shopItems) {
+      const row = document.createElement("div");
+      row.className = "item-row shop-item";
+      row.textContent = `${item.label} — Owned ${snapshot.bonuses[item.bonus]}`;
+      bonusSection.append(row);
+    }
+    els.shopList.append(bonusSection);
+    return;
+  }
   const now = Date.now();
   const rewardReadyAt = shopState.lastAdClaimAt + AD_COOLDOWN_MS;
   const rewardSeconds = Math.max(0, Math.ceil((rewardReadyAt - now) / 1000));
@@ -895,6 +1063,7 @@ function saveNicknameValue(value) {
 }
 
 function buyBonus(bonus) {
+  if (IS_EMBEDDED) { showToast("Account purchases are unavailable."); return; }
   const item = shopItems.find((candidate) => candidate.bonus === bonus);
   if (!item || state.profile.rays < item.cost) {
     showToast("Not enough Rays.");
@@ -921,6 +1090,7 @@ function buyBonus(bonus) {
 }
 
 async function claimAdReward() {
+  if (IS_EMBEDDED) { showToast("Rewarded ads are unavailable."); return; }
   if (isClaimingAdReward) return;
   const now = Date.now();
   if (now - shopState.lastAdClaimAt < AD_COOLDOWN_MS) {
@@ -1042,7 +1212,7 @@ function getMoveComboSize(move) {
   return Math.max(0, ...(move.matched ?? []).map((match) => match.ids?.length ?? 0));
 }
 
-function hydrateProgress(gameState, progress = loadPersistedProgress()) {
+function hydrateProgress(gameState, progress = IS_EMBEDDED ? persistedProgress : loadPersistedProgress()) {
   return {
     ...gameState,
     profile: {
@@ -1095,6 +1265,7 @@ function sanitizeNickname(value, fallback) {
 }
 
 function loadPersistedProgress() {
+  if (IS_EMBEDDED) return null;
   try {
     const raw = window.localStorage.getItem(PROGRESS_STORAGE_KEY);
     return raw ? JSON.parse(raw) : null;
@@ -1122,17 +1293,38 @@ function sanitizePreferences(preferences = {}) {
   };
 }
 
+function progressPayload() {
+  return {
+    version: APP_VERSION,
+    profile: state.profile,
+    bonuses: state.bonuses,
+    shop: shopState,
+  };
+}
+
 function persistProgress() {
+  const payload = progressPayload();
   try {
-    window.localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify({
-      version: APP_VERSION,
-      profile: state.profile,
-      bonuses: state.bonuses,
-      shop: shopState,
-    }));
+    if (IS_EMBEDDED) accountProgress.saveNow(payload);
+    else window.localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(payload));
+    persistedProgress = payload;
+    return true;
   } catch {
-    // Progress persistence is best-effort in private or restricted browser modes.
+    // Autosave may fail; Exit uses a separate strict save and must stay open on error.
+    if (IS_EMBEDDED) showToast("Progress not saved. Exit will require a successful save.");
+    return false;
   }
+}
+
+async function saveProgressForExit() {
+  const payload = progressPayload(); // snapshot captured before the asynchronous serialization
+  if (IS_EMBEDDED) {
+    if (!isAccountReady()) throw new Error("ACCOUNT_CONTEXT_CHANGED");
+    await accountProgress.save(payload); // its captured context is fenced before the sync write
+  } else {
+    writeVerifiedJson(window.localStorage, PROGRESS_STORAGE_KEY, payload);
+  }
+  persistedProgress = payload;
 }
 
 function persistPreferences() {
@@ -1147,6 +1339,7 @@ function persistPreferences() {
 }
 
 function loadAnalyticsEvents() {
+  if (IS_EMBEDDED) return []; // Hosted analytics use consent-controlled SDK only.
   try {
     const raw = window.localStorage.getItem(ANALYTICS_STORAGE_KEY);
     const events = raw ? JSON.parse(raw) : [];
@@ -1157,6 +1350,7 @@ function loadAnalyticsEvents() {
 }
 
 function recordLocalAnalytics(type, payload = {}) {
+  if (IS_EMBEDDED) return;
   try {
     const events = loadAnalyticsEvents();
     events.push({
@@ -1245,6 +1439,7 @@ function finishSplash() {
   audioController.stop("studioSplash");
   appView = pendingViewAfterSplash;
   render();
+  if (appView === "main" || appView === "nickname") telemetry.ready();
   if (appView === "nickname") els.nicknameInput.focus();
 }
 
@@ -1403,10 +1598,33 @@ async function checkForLatestVersion() {
       return;
     }
 
-    showToast(`Updating to v${latestVersion}...`);
-    window.setTimeout(() => reloadWithVersion(latestVersion), 420);
+    pendingVersion = latestVersion;
+    updateNoticeDismissed = false;
+    render();
+    showToast(`Update v${latestVersion} is ready in the main menu.`);
   } catch {
     showToast("Version check failed.");
+  }
+}
+
+function canApplyPendingUpdate() {
+  return Boolean(pendingVersion && !updateApplying && !exitBusy && !isClaimingAdReward
+    && !isAnimating && !activeTurn && !autoRun && !telemetry.hasMatch()
+    && (!hasStartedMatch || Boolean(state.winner)) && isAccountReady());
+}
+
+async function applyPendingUpdate() {
+  if (!canApplyPendingUpdate()) return;
+  updateApplying = true;
+  const version = pendingVersion;
+  try {
+    await saveProgressForExit();
+    if (!isAccountReady()) throw new Error("ACCOUNT_CONTEXT_CHANGED");
+    reloadWithVersion(version);
+  } catch {
+    updateApplying = false;
+    showToast("Could not save progress. Update postponed.");
+    render();
   }
 }
 
@@ -1455,14 +1673,23 @@ async function copyLastMoves(count = 10) {
     showToast(`Copied last ${Math.min(count, getSnapshot(state).moveHistory.length)} moves.`);
     return payload;
   } catch {
-    window.localStorage.setItem("crystalFrontLastMoves", payload);
+    const key = lastMovesStorageKey();
+    if (key) window.localStorage.setItem(key, payload);
     showToast("Saved last moves locally.");
     return payload;
   }
 }
 
+function lastMovesStorageKey() {
+  if (!IS_EMBEDDED) return "crystalFrontLastMoves";
+  return isAccountReady() ? `${accountOwner.storageNamespace}:lastMoves` : null;
+}
+
 function persistLastMoves() {
-  window.localStorage.setItem("crystalFrontLastMoves", window.crystalFrontDebug.dumpLastMoves(10));
+  const key = lastMovesStorageKey();
+  if (!key) return;
+  try { window.localStorage.setItem(key, window.crystalFrontDebug.dumpLastMoves(10)); }
+  catch { /* Diagnostic history must not interrupt a committed turn. */ }
 }
 
 function getControl(snapshot) {

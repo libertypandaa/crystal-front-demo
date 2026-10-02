@@ -31,6 +31,7 @@ jobs:
         run: |
           node tests/core-smoke.mjs
           node tests/cascade-chain.mjs
+          node tests/lpa-foundation.mjs
       - name: Verify source manifest
         run: node scripts/verify-demo-release.mjs
       - name: Assemble Pages artifact
