@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { createAccountProgressAdapter, createAccountSaveStore, createTelemetry, readEconomy, writeVerifiedJson } from "../src/presentation/browser/lpaFoundation.js";
+import { createAccountProgressAdapter, createTelemetry, readEconomy, writeVerifiedJson } from "../src/presentation/browser/lpaFoundation.js";
+import { createAccountSaveStore } from "./fake-commerce.mjs";
 
 const operationId = "11111111-1111-4111-8111-111111111111";
 const otherOperationId = "22222222-2222-4222-8222-222222222222";
@@ -72,6 +73,43 @@ assert.equal(accountA.load().pilotBombs, 1);
 assert.equal(createAccountSaveStore(storage, "fixture-account-A:crystal-front-demo").applyReceipt(operationId, productId, grant).pilotBombs, 1);
 assert.equal(accountB.load().pilotBombs, 0);
 assert.equal(storage.getItem("crystalFrontProgressV1"), "legacy-backup");
+
+// Fake transport only: the official SDK does not enable a production purchase.
+const purchaseTransport = (() => {
+  const accepted = new Map();
+  let debitCount = 0;
+  let dropFirstResponse = true;
+  return {
+    get debitCount() { return debitCount; },
+    async purchase(requestedProduct, requestedOperation) {
+      if (requestedOperation === otherOperationId) throw new Error("PRICE_CHANGED");
+      if (!accepted.has(requestedOperation)) {
+        debitCount += 1;
+        accepted.set(requestedOperation, { operationId: requestedOperation, productId: requestedProduct,
+          grant: { id: `grant-${requestedOperation}`, itemId: "bomb", quantity: 1 } });
+      }
+      if (dropFirstResponse) { dropFirstResponse = false; throw new Error("RESPONSE_LOST"); }
+      return accepted.get(requestedOperation);
+    },
+  };
+})();
+const retryStorage = memoryStorage();
+const firstSession = createAccountSaveStore(retryStorage, "fixture-pending-account");
+firstSession.beginPurchase(operationId, productId);
+await assert.rejects(purchaseTransport.purchase(productId, operationId), /RESPONSE_LOST/);
+const reopenedSession = createAccountSaveStore(retryStorage, "fixture-pending-account");
+assert.deepEqual(reopenedSession.load().pending, { operationId, productId });
+const recovered = await purchaseTransport.purchase(reopenedSession.load().pending.productId, reopenedSession.load().pending.operationId);
+reopenedSession.applyReceipt(recovered.operationId, recovered.productId, recovered.grant);
+reopenedSession.applyReceipt(recovered.operationId, recovered.productId, recovered.grant);
+assert.equal(reopenedSession.load().pilotBombs, 1);
+assert.equal(purchaseTransport.debitCount, 1);
+const quoted = createAccountSaveStore(memoryStorage(), "fixture-price-account");
+quoted.beginPurchase(otherOperationId, productId);
+await assert.rejects(purchaseTransport.purchase(productId, otherOperationId), /PRICE_CHANGED/);
+assert.deepEqual(quoted.load().pending, { operationId: otherOperationId, productId });
+assert.equal(quoted.load().pilotBombs, 0);
+assert.equal(purchaseTransport.debitCount, 1);
 
 const denied = { getItem: () => null, setItem: () => { throw Error("QUOTA"); } };
 assert.throws(() => writeVerifiedJson(denied, "x", { data: 1 }), /QUOTA/);

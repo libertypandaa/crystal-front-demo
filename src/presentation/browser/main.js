@@ -3,7 +3,7 @@ import { createGame, getSnapshot, restart, runAiTurnWithTrace, runComputerTurnWi
 import { MockRewardedAdProvider, RewardedAdStatus } from "./rewardedAds.js";
 import { createAccountProgressAdapter, createTelemetry, readEconomy, writeVerifiedJson } from "./lpaFoundation.js";
 
-const APP_VERSION = "0.1.33";
+const APP_VERSION = "0.1.34";
 const IS_EMBEDDED = window.parent !== window;
 const platform = window.LibertyPanda;
 const telemetry = createTelemetry(window.LibertyPandaAnalytics);
@@ -74,6 +74,7 @@ let accountOwner = null;
 let accountStatus = "unknown";
 let accountError = null;
 let exitBusy = false;
+let exitEnabled = false;
 let exitReturnView = "main";
 let economyRead = { status: "unavailable" };
 let economyReadGeneration = 0;
@@ -137,6 +138,7 @@ const els = {
   menuButton: document.querySelector("#menuButton"),
   pauseButton: document.querySelector("#pauseButton"),
   mainMenu: document.querySelector("#mainMenu"),
+  exitGameButton: document.querySelector("#exitGameButton"),
   studioSplash: document.querySelector("#studioSplash"),
   testAdOverlay: document.querySelector("#testAdOverlay"),
   testAdProgress: document.querySelector("#testAdProgress"),
@@ -397,7 +399,6 @@ async function initializeAccountContext() {
     return;
   }
   platform.onAccountContextChange(handleAccountContext); // subscribe before the first request
-  platform.enableExit();
   if (!accountProgress) {
     accountError = "STORAGE_UNAVAILABLE";
     if (appView !== "splash") { appView = "account"; render(); }
@@ -590,6 +591,11 @@ function renderVisibleTurn() {
 
 function render(snapshot = getSnapshot(state), phase = null) {
   updateScreens(snapshot);
+  if (IS_EMBEDDED && !exitEnabled && appView === "main" && isAccountReady()
+    && !els.mainMenu.hidden && !els.exitGameButton.hidden) {
+    platform.enableExit();
+    exitEnabled = true;
+  }
   updateTelemetryPlaying();
   const control = getControl(snapshot);
   els.board.style.setProperty("--player-control", `${control.playerPercent}%`);

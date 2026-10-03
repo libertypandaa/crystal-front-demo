@@ -19,7 +19,7 @@ if (expected.size !== manifest.files.length || !expected.has("index.html")) {
 }
 
 for (const entry of manifest.files) {
-  if (!/^(?:index\.html$|src\/|assets\/runtime\/|assets\/generated\/audio\/core-sfx-kits-v1\/|tests\/(?:core-smoke|cascade-chain|lpa-foundation)\.mjs$|scripts\/verify-demo-release\.mjs$)/.test(entry.path)
+  if (!/^(?:index\.html$|src\/|assets\/runtime\/|assets\/generated\/audio\/core-sfx-kits-v1\/|tests\/(?:core-smoke|cascade-chain|lpa-foundation|fake-commerce|lpa-browser)\.mjs$|scripts\/verify-demo-release\.mjs$)/.test(entry.path)
     || entry.path.includes("..") || entry.path.includes("\\")) {
     throw new Error(`Unexpected release path: ${entry.path}`);
   }

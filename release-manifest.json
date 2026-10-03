@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "sourceRepository": "libertypandaa/cristal-front-2",
-  "sourceCommit": "1e766895fcfee4b41a3228a772e097413e1a7dfa",
+  "sourceCommit": "2f54c87741bc132f11952cc98f0da488a0b69654",
   "releaseRepository": "libertypandaa/crystal-front-demo",
   "files": [
     {
@@ -661,14 +661,14 @@
     {
       "path": "index.html",
       "bytes": 14574,
-      "gitBlobSha": "1fe2bd96a089a1879dff87bb76bf80593ddbaf2f",
-      "sha256": "6c720e5c20af63f38de62137d8c9bec457ed752a0a949991d3989cc62a10a41d"
+      "gitBlobSha": "041b74dadcf8153cb89c81686e9053aa6f594f0b",
+      "sha256": "9d0cdd115e9c2213319dfe301089109b9529320e0261a2ea6b7fb7cd325a9e41"
     },
     {
       "path": "scripts/verify-demo-release.mjs",
-      "bytes": 2560,
-      "gitBlobSha": "7ec5fb51f4ba9d2108e0b932b7780a7eda7aa243",
-      "sha256": "c5b28c986bb7851c9d9a8df9dd98aa92801862dddcab0d02ae4f59900066a9df"
+      "bytes": 2586,
+      "gitBlobSha": "7cd8c707e016f968d30c0533d39985fc7eab5734",
+      "sha256": "ba9f8a7da97f48c13c9899e59a5ea059dff1a76d99fc5842dee2f74a1265b18d"
     },
     {
       "path": "src/core/board.js",
@@ -696,15 +696,15 @@
     },
     {
       "path": "src/presentation/browser/lpaFoundation.js",
-      "bytes": 7255,
-      "gitBlobSha": "7c8c6985b3c9db9f94e1d5ff45dc129e03d7451c",
-      "sha256": "9012efb349ab3ea2a60941784875770fc465c951e50fb992dc69ca2bb5c356c5"
+      "bytes": 4769,
+      "gitBlobSha": "332da76016bb344c9e89a3285af37923aa41b1d9",
+      "sha256": "856b3774e2a94f03bd4cb457d5abe6da9236c0cc93c2a1834c5cda6dda92773e"
     },
     {
       "path": "src/presentation/browser/main.js",
-      "bytes": 67774,
-      "gitBlobSha": "cdd7f3ea635445dfe0fd5c2dff580c3054d8531f",
-      "sha256": "5ef42620feb59a511392b8f1e648c71939f77c4f557a1f2341eb2b7a72b6ecd3"
+      "bytes": 68027,
+      "gitBlobSha": "37becc088e8099ddd3d2dd8a325f3320e1d85345",
+      "sha256": "060eeabd987f0fb92769f7e3f1360e83173b43e74a884e837e31b7423a636fed"
     },
     {
       "path": "src/presentation/browser/rewardedAds.js",
@@ -743,11 +743,22 @@
       "sha256": "25940dfc0ccaaeccaa2834bf23c0f026c2768aed388c9018580dcaa435beb987"
     },
     {
+      "path": "tests/fake-commerce.mjs",
+      "bytes": 2591,
+      "gitBlobSha": "6229bf31d12a9eb70a2f82d63e01cf986ea4d96c",
+      "sha256": "74258e4783d1ce4e1f427a221e5d8009eed14372181560e2c95210d735d6e079"
+    },
+    {
+      "path": "tests/lpa-browser.mjs",
+      "bytes": 23363,
+      "gitBlobSha": "87d069db4c53ace0999e72252447d2797408285f",
+      "sha256": "ecd87ea774aaac38d100b1814b607adb1413dbd7eb9832b13af256664e516fc8"
+    },
+    {
       "path": "tests/lpa-foundation.mjs",
-      "bytes": 7707,
-      "gitBlobSha": "d6006394c2ad0d1a16c4d1e5fd12f9fe5ca20bd5",
-      "sha256": "0a5462a31dd9e8574317cfcecba92d4f57bfeefed873b4534becd750b08d4b13"
+      "bytes": 9835,
+      "gitBlobSha": "86a046b7b8ef9d140a26ab924083271933fc4712",
+      "sha256": "40b939a4972bb16a5f5e12e56b1f3ddc4cb4a127142b9c0373b5b3fb78762a21"
     }
   ]
 }
-
