@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Crystal Front · Обучение</title>
+  <link rel="stylesheet" href="../game.css">
+  <link rel="stylesheet" href="./training.css">
+</head>
+<body data-view="main">
+  <main class="game-shell battle-shell training-shell" aria-label="Кристальный фронт">
+    <section class="zone zone-hud" aria-label="Счёт матча">
+      <div class="duelist duelist-player"><span class="duelist-name">ТЫ</span><strong id="playerScore">0</strong></div>
+      <div class="turn-core"><span id="matchLabel">ТРЕНИРОВКА</span><strong id="turnNumber">1</strong><span id="turnOwner" class="micro-chip">Твой ход</span></div>
+      <div class="duelist duelist-rival"><span class="duelist-name">СОПЕРНИК</span><strong id="aiScore">0</strong></div>
+    </section>
+    <section id="territory" class="zone territory" aria-label="Доля территории">
+      <div class="territory-labels"><span id="blueShare">Твоя 50%</span><span id="redShare">Соперника 50%</span></div>
+      <div class="territory-track"><div id="blueFill"></div></div>
+    </section>
+    <section class="zone zone-board" aria-label="Игровое поле">
+      <div class="board-wrap"><div id="board" class="board" role="grid" aria-label="Игровое поле 8 на 8"></div></div>
+    </section>
+    <section id="coach" class="zone coach" aria-live="polite">
+      <div class="coach-top"><span id="stepTitle">Территория</span><span id="stepCount">1 / 4</span></div>
+      <p id="hint"></p>
+    </section>
+    <section id="bonusRow" class="zone zone-bonuses" aria-label="Бонусы" hidden>
+      <button class="bonus-card" data-bonus="bomb" type="button"><span class="bonus-icon bonus-icon-bomb" aria-hidden="true"></span><strong>БОМБА</strong><span id="bonus-bomb">3</span></button>
+      <button class="bonus-card" data-bonus="line" type="button"><span class="bonus-icon bonus-icon-line" aria-hidden="true"></span><strong>ЛИНИЯ</strong><span id="bonus-line">3</span></button>
+      <button class="bonus-card" data-bonus="mix" type="button"><span class="bonus-icon bonus-icon-mix" aria-hidden="true"></span><strong>ПЕРЕМЕШАТЬ</strong><span id="bonus-mix">2</span></button>
+      <button class="bonus-card" data-bonus="color" type="button"><span class="bonus-icon bonus-icon-color" aria-hidden="true"></span><strong>ЦВЕТ</strong><span id="bonus-color">2</span></button>
+    </section>
+    <footer class="zone training-footer"><button id="leaveBattle" class="dock-button" type="button">Пропустить</button><span id="battleStatus" role="status"></span><button id="nextLesson" class="dock-button" type="button" disabled>Дальше</button></footer>
+  </main>
+  <script type="module" src="./training.js"></script>
+</body>
+</html>
